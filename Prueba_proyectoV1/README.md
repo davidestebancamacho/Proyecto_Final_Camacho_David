@@ -9,16 +9,18 @@ Analizar variables como presupuesto, popularidad, votos y género para predecir 
 ## 🚀 Tecnologías utilizadas
 
 - Python
-- Pandass
+- Pandas
 - Scikit-learn
+- XGBoost
 - SHAP
 - Plotly
 - Gradio
 
-## 🤖 Modelos utilizadosss
+## 🤖 Modelos utilizados
 
-- Logistic Regression
+- Ridge Regression
 - Random Forest
+- XGBoost
 
 ## 📊 Técnicas aplicadas
 
