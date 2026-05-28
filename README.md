@@ -1,244 +1,160 @@
-# 🎬 Predicción de Popularidad de Películas — TMDB ML Project
+# 🎬 TMDB Movies ML — Predicción de Popularidad
 
-> **Un análisis completo de Machine Learning + Explainability AI (SHAP) para predecir la popularidad de películas en TMDB**
-
----
-
-## 📌 Resumen del Proyecto
-
-Este proyecto utiliza **ciencia de datos y aprendizaje automático** para responder una pregunta clave:
-
-> **¿Qué características de una película predicen mejor su popularidad en TMDB?**
-
-A través de análisis exploratorio, modelado con **XGBoost**, y explicabilidad con **SHAP**, identificamos que el **número de votos (engagement)** y la **recaudación en taquilla (revenue)** son los factores más influyentes en la popularidad, no la calidad (rating) de la película.
+Análisis completo de Machine Learning sobre el dataset TMDB Movies Metadata.  
+**Pregunta central:** ¿Qué características de una película predicen mejor su popularidad?
 
 ---
 
-## 🎯 Objetivo Principal
+## Contenido del proyecto
 
-- Construir un modelo predictivo capaz de estimar la popularidad de películas
-- Identificar qué variables tienen mayor impacto en la predicción
-- Generar insights accionables para productoras y plataformas de streaming
-
----
-
-## 📊 Dataset
-
-**The Movies Dataset** (Kaggle)
-- ~45,000 películas
-- Variables: presupuesto, recaudación, duración, calificación, votos, géneros, etc.
-- Período: hasta ~2017
+| Sección | Archivo | Qué cubre |
+|---------|---------|-----------|
+| 1–4 | `src/proyecto_peliculas_ml.py` | Exploración · Limpieza · Modelos · SHAP |
+| 5 | `src/seccion_series_tiempo.py` | Análisis temporal · STL · SARIMA · Prophet |
+| 6 | `src/visualizaciones_complementarias.py` | 8 visualizaciones adicionales |
+| App | `src/app_gradio.py` | Mini-app interactiva con Gradio |
 
 ---
 
-## 🚀 Tecnologías Utilizadas
+## Visualizaciones incluidas (22 en total)
 
-| Categoría | Tecnologías |
-|-----------|------------|
-| **Lenguaje** | Python 3.x |
-| **Procesamiento** | Pandas, NumPy |
-| **ML** | Scikit-learn, XGBoost, Random Forest |
-| **Explicabilidad** | SHAP (TreeExplainer) |
-| **Visualización** | Plotly, Matplotlib |
-| **App Interactiva** | Gradio |
+**Proyecto principal**
+- Distribuciones de variables clave
+- Matriz de correlaciones interactiva
+- Popularidad por género (boxplot)
+- Comparación de modelos (radar 5 métricas)
+- R² por segmento de popularidad
+- Real vs Predicho + residuos
+- SHAP: Bar · Beeswarm · Dependence Plot
 
----
+**Series de tiempo**
+- Serie temporal con media móvil
+- Descomposición STL (4 componentes)
+- Walk-forward validation visual
+- Pronóstico Real vs 3 modelos
+- Comparación de métricas de pronóstico
+- Perfil estacional mensual
 
-## 🤖 Modelos Entrenados
-
-| Modelo | MAE | RMSE | R² | CV-R² |
-|--------|-----|------|-------|-------|
-| **Ridge** | 0.52 | 0.71 | 0.62 | 0.61 |
-| **Random Forest** | 0.45 | 0.59 | 0.71 | 0.69 |
-| **XGBoost** ⭐ | 0.41 | 0.54 | **0.74** | **0.73** |
-
-**Ganador: XGBoost** — Explica el **74%** de la varianza en popularidad
-
----
-
-## 📁 Estructura del Repositorio
-
-```
-Proyecto_Final_Camacho_David/
-├── README.md                              # Este archivo
-├── modelos_regresion_notebook.ipynb       # Análisis inicial
-└── Prueba_proyectoV1/
-    ├── Proyecto_final_Camacho_David (2).ipynb  # Notebook completo
-    ├── proyecto_peliculas_ml (2).py       # Código Python limpio
-    ├── requirements.txt                   # Dependencias
-    └── README.md                          # Detalles del proyecto
-```
+**Complementarias**
+- ROI scatter: Budget vs Revenue
+- Heatmap evolución por género × año
+- Error del modelo por año (deriva temporal)
+- ACF / PACF interactivo (justifica SARIMA)
+- Diagnóstico de residuos SARIMA
+- Prophet descompuesto (trend + yearly)
+- Sample weights por quintil (balanceo)
+- PowerTransformer vs log1p vs raw
 
 ---
 
-## 🔍 Hallazgos Clave (SHAP)
+## Decisiones técnicas clave
 
-### Top 3 Variables Más Influyentes:
-1. **`log_votes`** (0.42 |SHAP|) — Engagement es el factor dominante
-2. **`log_revenue`** (0.25 |SHAP|) — Distribución global amplifica popularidad
-3. **`log_budget`** (0.18 |SHAP|) — Presupuesto tiene impacto moderado
+### Predicción (Sección 2)
+- **Sin data leakage**: imputación, log1p y StandardScaler dentro del Pipeline
+- **Stratified split**: garantiza representación uniforme de películas virales
+- **Hiperparámetros**: RidgeCV automático · RandomizedSearchCV para RF y XGBoost
+- **Balanceo**: PowerTransformer(yeo-johnson) + sample_weights inversamente proporcionales
+- **Smoke tests**: 10 verificaciones antes del entrenamiento completo
 
-### Sorpresa Importante:
-- **`vote_average`** (rating/calidad) tiene impacto **muy bajo** (~0.05)
-- ❌ Ser "buena película" ≠ Ser popular
-- ✅ Llegar a mucha gente > gustarle a pocos
+### Explicabilidad (Sección 3)
+- SHAP TreeExplainer sobre el mejor modelo
+- Visualizaciones en Plotly (interactivas, no estáticas)
 
----
-
-## 💡 Recomendaciones Accionables
-
-Para **maximizar la popularidad** de una película:
-
-### ✅ Estrategia Ganadora
-1. **Distribución amplia** → Asegurar estreno en múltiples mercados/plataformas
-2. **Engagement temprano** → Campañas activas de críticas y reseñas en semana 1
-3. **Marketing masivo** → El efecto multiplicador de votos + recaudación es exponencial
-
-### ⚠️ Trampas a Evitar
-- Producción costosa sin distribución = popularidad baja
-- Enfocarse solo en calidad narrativa sin estrategia de lanzamiento
-- Neglectar feedback temprano (votos de críticos y streaming)
+### Series de tiempo (Sección 5)
+- Variable: revenue medio mensual 1990–2017 (no popularity, que es un snapshot)
+- Validación: walk-forward con expanding window · h=12 meses
+- Métricas: MAE · RMSE · MAPE · SMAPE (no R²)
+- Modelos: Naive estacional · SARIMA (orden por AIC) · Prophet
 
 ---
 
-## 🛠️ Cómo Usar
+## Instalación
 
-### 1. Instalar Dependencias
 ```bash
-cd Prueba_proyectoV1
+# 1. Clonar el repo
+git clone https://github.com/TU_USUARIO/tmdb-movies-ml.git
+cd tmdb-movies-ml
+
+# 2. Crear entorno virtual
+python -m venv venv
+source venv/bin/activate        # Mac / Linux
+# venv\Scripts\activate         # Windows
+
+# 3. Instalar dependencias
 pip install -r requirements.txt
+
+# 4. Descargar el dataset
+# Ver instrucciones en data/README.md
 ```
 
-### 2. Ejecutar el Notebook
+---
+
+## Ejecución
+
+### En orden (notebook / Colab)
 ```bash
-# Opción 1: Jupyter Notebook
-jupyter notebook "Proyecto_final_Camacho_David (2).ipynb"
-
-# Opción 2: Google Colab (recomendado)
-# Subir el notebook a Colab y ejecutar celdas
+# Ejecutar en secuencia — cada archivo asume el anterior en memoria
+python src/proyecto_peliculas_ml.py
+python src/seccion_series_tiempo.py
+python src/visualizaciones_complementarias.py
 ```
 
-### 3. Ejecutar la App Interactiva (Gradio)
+### App interactiva
 ```bash
-python "proyecto_peliculas_ml (2).py"
-# Luego abrir http://localhost:7860
+python src/app_gradio.py
+# Abre http://localhost:7860
+```
+
+### Exportar visualizaciones a HTML
+Descomenta `save(fig, "nombre")` en cualquier archivo — genera HTMLs
+standalone en `outputs/html/` que se abren en el browser sin Python.
+
+---
+
+## Estructura del repositorio
+
+```
+tmdb-movies-ml/
+├── src/
+│   ├── proyecto_peliculas_ml.py          # Análisis principal
+│   ├── seccion_series_tiempo.py          # Series de tiempo
+│   ├── visualizaciones_complementarias.py # 8 vizs adicionales
+│   └── app_gradio.py                     # Mini-app
+├── notebooks/                            # Versiones .ipynb (opcional)
+├── outputs/
+│   └── html/                             # Gráficos exportados
+├── data/
+│   └── README.md                         # Instrucciones de descarga
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
 
 ---
 
-## 📈 Visualizaciones Generadas
+## Resultados principales
 
-El notebook incluye **8 visualizaciones interactivas**:
+| Modelo | R² test | MAE | MAPE |
+|--------|---------|-----|------|
+| Ridge (RidgeCV) | ~0.51 | — | — |
+| Random Forest | ~0.71 | — | — |
+| **XGBoost** | **~0.74** | — | — |
 
-1. **Distribuciones principales** — Histogramas de variables clave
-2. **Matriz de correlaciones** — Heatmap TMDB
-3. **Popularidad por género** — Boxplot comparativo
-4. **Comparación de modelos** — Radar chart normalizado
-5. **Real vs Predicho** — Scatter + residuos (XGBoost)
-6. **SHAP Bar Plot** — Importancia media de variables
-7. **SHAP Beeswarm** — Efecto individual de cada feature
-8. **SHAP Dependence** — Interacciones entre variables
+> Los valores exactos dependen del split aleatorio. Ejecutar el código para ver los números actualizados.
 
----
-
-## 📝 Secciones del Análisis
-
-### Sección 1: Exploración y Limpieza
-- Carga de dataset
-- Manejo de valores faltantes
-- Transformaciones logarítmicas
-- Codificación de géneros
-
-### Sección 2: Modelado Supervisado
-- Train/test split (80/20)
-- 3 modelos: Ridge, Random Forest, XGBoost
-- Validación cruzada (5-fold)
-- Comparación de métricas
-
-### Sección 3: SHAP + Explicabilidad
-- Cálculo de SHAP values
-- Bar plots, beeswarm, dependence plots
-- Exportación de datos para análisis externo
-- Dashboard interactivo en Gradio
-
-### Sección 4: Conclusiones
-- Hallazgos clave
-- Limitaciones del modelo
-- Recomendaciones accionables
-
-### Sección 5: Reflexión sobre IA
-- Cómo se utilizó Claude/IA en el desarrollo
-- Decisiones colaborativas
-- Limitaciones y mejoras futuras
+**Variables más importantes (SHAP):** `log_votes` › `log_revenue` › `log_budget` › `vote_average`
 
 ---
 
-## 🎓 Conceptos Técnicos Aplicados
+## Stack tecnológico
 
-- ✅ **Regresión Supervisada** — Predicción de variable continua
-- ✅ **Feature Engineering** — Transformaciones logarítmicas
-- ✅ **Pipeline (Scikit-learn)** — Escalado + Modelo en un objeto
-- ✅ **Explainable AI (SHAP)** — Interpretabilidad de modelos complejos
-- ✅ **Validación Cruzada** — Evaluación robusta
-- ✅ **Visualización Interactiva** — Plotly + Gradio
+`Python 3.10+` · `pandas` · `numpy` · `scikit-learn` · `xgboost` · `shap`  
+`statsmodels` · `prophet` · `plotly` · `gradio` · `scipy`
 
 ---
 
-## ⚠️ Limitaciones Conocidas
+## Uso de IA en el desarrollo
 
-1. **Dataset anticuado** — Datos hasta ~2017; streaming post-2019 cambió patrones
-2. **Popularidad dinámica** — TMDB actualiza valores con el tiempo
-3. **Variables faltantes** — Sin datos de elenco, director, distribuidora
-4. **Presupuestos ocultos** — Muchas películas no reportan budget
-5. **Sesgo histórico** — Películas clásicas tienen más votos acumulados
-
----
-
-## 🚀 Mejoras Futuras
-
-- [ ] Incorporar datos de redes sociales (Twitter, TikTok)
-- [ ] Agregar información de elenco y directores
-- [ ] Modelado de series de tiempo (tracking de popularidad)
-- [ ] Predicción de éxito crítico vs comercial por separado
-- [ ] Deploy de API REST (FastAPI)
-- [ ] Dashboard público (Streamlit o Dash)
-
----
-
-## 👤 Autor
-
-**David Estebán Camacho**  
-*Data Science & ML Engineer*
-
----
-
-## 📜 Licencia
-
-Este proyecto es de código abierto y está disponible bajo licencia MIT.
-
----
-
-## 📊 Estadísticas del Proyecto
-
-| Métrica | Valor |
-|---------|-------|
-| Líneas de código Python | ~2,500+ |
-| Líneas en Notebook | ~1,200+ |
-| Visualizaciones | 8+ interactivas |
-| Modelos comparados | 3 |
-| Mejor R² | 0.74 |
-| Dataset utilizado | 45K películas |
-| Tiempo de entrenamiento | ~5 min |
-
----
-
-## 🔗 Links Útiles
-
-- 📚 [Dataset en Kaggle](https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset)
-- 📖 [Documentación SHAP](https://shap.readthedocs.io/)
-- 🎓 [Scikit-learn Pipelines](https://scikit-learn.org/stable/modules/compose.html)
-- 🎨 [Plotly Documentation](https://plotly.com/python/)
-
----
-
-**⭐ Si te resulta útil, dale una estrella al repositorio!**
+Este proyecto fue desarrollado con asistencia de **Claude (Anthropic)** en todas las etapas:
+exploración, limpieza, modelado, explicabilidad SHAP, análisis de series de tiempo y mini-app.
+Ver Sección 5 del código principal para la reflexión completa sobre el uso de IA.

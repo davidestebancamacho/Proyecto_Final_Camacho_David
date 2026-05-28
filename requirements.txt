@@ -1,0 +1,28 @@
+# ============================================================
+#  TMDB Movies ML — Dependencias
+#  Probado con Python 3.10 / 3.11
+#  Instalación: pip install -r requirements.txt
+# ============================================================
+
+# Core científico
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.13.1
+
+# Machine Learning
+scikit-learn==1.5.1
+xgboost==2.0.3
+shap==0.45.1
+
+# Series de tiempo
+statsmodels==0.14.2
+prophet==1.1.5
+
+# Visualización
+plotly==5.22.0
+
+# App interactiva
+gradio==4.36.1
+
+# Utilidades
+ast-decompiler==0.7.0  # parseo de JSON embebido en TMDB
