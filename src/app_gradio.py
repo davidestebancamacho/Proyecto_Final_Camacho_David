@@ -42,7 +42,7 @@ NIVEL_EMOJIS = ["🥶","😐","🙂","🔥","🚀","🌟"]
 #  ENTRENAMIENTO (se ejecuta al iniciar la app)
 # ════════════════════════════════════════════════════════════
 
-def entrenar_modelo(csv_path="movies_metadata.csv"):
+def entrenar_modelo(csv_path="data/movies_metadata.csv"):
     df = pd.read_csv(csv_path, low_memory=False)
     movies = df[["title","budget","revenue","runtime",
                  "vote_average","vote_count","popularity","genres"]].copy()
