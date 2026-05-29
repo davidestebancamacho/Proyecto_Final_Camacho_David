@@ -435,7 +435,7 @@ with gr.Blocks(css=CSS, title="🎬 Movie Popularity Predictor") as demo:
 
 if __name__ == "__main__":
     demo.launch(
-        share=False,          # True para generar link público temporal
+        share=True,          # True para generar link público temporal
         server_port=7860,
         show_error=True
     )
