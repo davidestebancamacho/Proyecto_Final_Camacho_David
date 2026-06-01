@@ -29,6 +29,7 @@ warnings.filterwarnings("ignore")
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DEFAULT_CSV_PATH = os.path.join(BASE_DIR, "data", "movies_metadata.csv")
+DEFAULT_SERVER_PORT = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
 
 # ── Constantes ───────────────────────────────────────────────
 TOP_GENRES = ["Drama","Comedy","Thriller","Action",
@@ -437,8 +438,16 @@ with gr.Blocks(css=CSS, title="🎬 Movie Popularity Predictor") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch(
-        share=False,
-        server_port=7860,
-        show_error=True
-    )
+    try:
+        demo.launch(
+            share=False,
+            server_port=DEFAULT_SERVER_PORT,
+            show_error=True
+        )
+    except OSError as e:
+        print(f"⚠️  Puerto {DEFAULT_SERVER_PORT} ocupado, intentando puerto automático...")
+        demo.launch(
+            share=False,
+            server_port=0,
+            show_error=True
+        )

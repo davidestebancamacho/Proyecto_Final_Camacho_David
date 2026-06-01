@@ -1,6 +1,6 @@
 # ============================================================
 #  TMDB Movies ML — Dependencias
-#  Probado con Python 3.10 / 3.11
+#  Probado con Python 3.9 / 3.10 / 3.11
 #  Instalación: pip install -r requirements.txt
 # ============================================================
 
