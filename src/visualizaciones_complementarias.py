@@ -17,8 +17,19 @@
 #    VIZ-C8  Skewness antes/después de PowerTransformer (balanceo)
 # ============================================================
  
+import os
+import ast
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, FunctionTransformer, PowerTransformer
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import Ridge
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.utils.class_weight import compute_sample_weight
+from xgboost import XGBRegressor
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -36,6 +47,128 @@ if "GENRE_COLS" not in dir():
     GENRE_COLS   = TOP_GENRES
 if "FEATURES_RAW" not in dir():
     FEATURES_RAW = NUM_CONT + TOP_GENRES
+
+
+def parse_genres(g):
+    try:
+        return [x["name"] for x in ast.literal_eval(g)] if pd.notna(g) else []
+    except Exception:
+        return []
+
+
+def load_movies_and_df(csv_path="data/movies_metadata.csv"):
+    df = pd.read_csv(csv_path, low_memory=False)
+    movies = df[["title","budget","revenue","runtime",
+                 "vote_average","vote_count","popularity","genres"]].copy()
+    for col in ["budget","revenue","popularity"]:
+        movies[col] = pd.to_numeric(movies[col], errors="coerce")
+    movies["genre_list"] = movies["genres"].apply(parse_genres)
+    for g in TOP_GENRES:
+        movies[g] = movies["genre_list"].apply(lambda lst: int(g in lst))
+    movies = movies.dropna(subset=["popularity"])
+    for col in ["budget","revenue"]:
+        movies[col] = movies[col].replace(0, np.nan)
+    movies.drop_duplicates(subset=["title"], inplace=True)
+    movies["log_popularity"] = np.log1p(movies["popularity"])
+    movies["_log_votes"] = np.log1p(movies["vote_count"].fillna(0))
+    movies["_log_popularity"] = movies["log_popularity"]
+    return df, movies
+
+
+def build_ml_components(movies):
+    X = movies[FEATURES_RAW]
+    y = movies["log_popularity"]
+    pop_bins = pd.qcut(y, q=5, labels=False)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=pop_bins
+    )
+    pt_target = PowerTransformer(method="yeo-johnson", standardize=False)
+    y_train_pt = pt_target.fit_transform(y_train.values.reshape(-1,1)).ravel()
+    sample_weights = compute_sample_weight(
+        class_weight="balanced",
+        y=pd.qcut(y_train, q=5, labels=False)
+    )
+
+    numeric_transformer = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("log", FunctionTransformer(np.log1p, validate=True)),
+        ("power", PowerTransformer(method="yeo-johnson")),
+        ("scaler", StandardScaler()),
+    ])
+    genre_transformer = Pipeline([("scaler", StandardScaler())])
+    preprocessor = ColumnTransformer([
+        ("num", numeric_transformer, NUM_CONT),
+        ("genre", genre_transformer, GENRE_COLS),
+    ])
+
+    pipe_cache = {}
+
+    def get_base_pipe(model_name="XGBoost"):
+        if model_name in pipe_cache:
+            return pipe_cache[model_name]
+
+        if model_name == "XGBoost":
+            model = XGBRegressor(learning_rate=0.05, subsample=0.8,
+                                 colsample_bytree=0.8, random_state=42,
+                                 verbosity=0)
+        elif model_name == "RandomForest":
+            model = RandomForestRegressor(n_estimators=200, n_jobs=-1, random_state=42)
+        else:
+            model = Ridge()
+
+        pipe = Pipeline([
+            ("prep", preprocessor),
+            ("m", model)
+        ])
+        pipe.fit(X_train, y_train_pt)
+        pipe_cache[model_name] = pipe
+        return pipe
+
+    mejor = "XGBoost"
+    return X_test, y_test, y_train, pt_target, sample_weights, get_base_pipe, mejor
+
+
+REQUIRED_EXTERNAL = [
+    "movies", "df", "X_test", "y_test", "pt_target",
+    "get_base_pipe", "mejor", "sample_weights", "y_train",
+    "ts", "sarima_model"
+]
+missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
+if missing:
+    print("⚠️  Variables faltantes en memoria — cargando datos y entrenando componentes básicos...")
+    df, movies = load_movies_and_df()
+    X_test, y_test, y_train, pt_target, sample_weights, get_base_pipe, mejor = build_ml_components(movies)
+    ts = None
+    try:
+        ts_raw = df[["release_date","revenue"]].copy()
+        ts_raw["revenue"] = pd.to_numeric(ts_raw["revenue"], errors="coerce")
+        ts_raw["release_date"] = pd.to_datetime(ts_raw["release_date"], errors="coerce")
+        ts_raw = ts_raw[(ts_raw["revenue"] > 0)].dropna()
+        ts_raw = ts_raw[(ts_raw["release_date"].dt.year >= 1990) &
+                        (ts_raw["release_date"].dt.year <= 2017)]
+        ts_raw["month"] = ts_raw["release_date"].dt.to_period("M")
+        ts = (ts_raw.groupby("month")["revenue"]
+              .agg(revenue_medio="mean", n_peliculas="count")
+              .reset_index())
+        ts["month"] = ts["month"].dt.to_timestamp()
+        ts = ts.set_index("month").sort_index().asfreq("MS")
+        ts["revenue_medio"] = ts["revenue_medio"].interpolate(method="time")
+        ts["n_peliculas"] = ts["n_peliculas"].fillna(0).astype(int)
+    except Exception as e:
+        raise RuntimeError(f"No se pudo construir la serie temporal: {e}")
+
+    if "sarima_model" not in globals():
+        from statsmodels.tsa.arima.model import ARIMA
+        sarima_model = ARIMA(ts["revenue_medio"], order=(1,1,1), seasonal_order=(1,1,1,12)).fit()
+        print("⚠️  Se entrenó un SARIMA básico porque sarima_model no estaba disponible.")
+
+    missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
+    if missing:
+        raise RuntimeError(
+            "visualizaciones_complementarias.py requiere ejecutar proyecto_peliculas_ml.py "
+            "y seccion_series_tiempo.py en el mismo intérprete antes de usarlo, o tener acceso a data/movies_metadata.csv. "
+            f"Variables faltantes después de la carga: {', '.join(missing)}"
+        )
  
 DARK_BG   = "#0D1117"
 PANEL_BG  = "#161B22"

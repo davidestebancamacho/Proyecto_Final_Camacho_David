@@ -31,9 +31,7 @@ def save_html(fig, name):
 # ════════════════════════════════════════════════════════════
 print("PASO 1 — Construyendo serie temporal...")
  
-try:
-    _ = df
-except NameError:
+if "df" not in globals():
     df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
  
 ts_raw = df[["release_date","revenue"]].copy()
@@ -87,10 +85,11 @@ r3 = test_estacionariedad(s_log_d1,  "log(revenue) d=1")
  
 # Selección automática del orden de diferenciación
 try:
-    from pmdarima.arima.utils import ndiffs
+    import importlib
+    ndiffs = importlib.import_module("pmdarima.arima.utils").ndiffs
     d_auto = ndiffs(s0, test="adf")
     print(f"\n  ndiffs automático (pmdarima): d = {d_auto}")
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     d_auto = 1
     print(f"\n  pmdarima no disponible — usando d=1 por ADF")
  
@@ -322,13 +321,17 @@ print(f"  Mejor ETS: {best_ets_name} (AIC={best_ets_aic:.1f})")
 print("  Ajustando Prophet con tuning...")
 Prophet = None
 try:
-    from prophet import Prophet
-except ImportError:
+    import importlib
+    prophet_module = importlib.import_module("prophet")
+    Prophet = prophet_module.Prophet
+except (ImportError, ModuleNotFoundError):
     try:
-        from fbprophet import Prophet
-    except ImportError:
+        import importlib
+        prophet_module = importlib.import_module("fbprophet")
+        Prophet = prophet_module.Prophet
+    except (ImportError, ModuleNotFoundError):
         print("  ⚠️  Prophet no disponible — se omite este modelo")
- 
+
 prophet_train_df = pd.DataFrame({
     "ds": train_ts.index,
     "y":  train_ts.values
