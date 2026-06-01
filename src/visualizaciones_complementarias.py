@@ -42,6 +42,19 @@ PANEL_BG  = "#161B22"
 TEXT_COL  = "#C9D1D9"
 GRID_COL  = "rgba(255,255,255,0.06)"
  
+REQUIRED_EXTERNAL = [
+    "movies", "df", "X_test", "y_test", "pt_target",
+    "get_base_pipe", "mejor", "sample_weights", "y_train",
+    "ts", "sarima_model"
+]
+missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
+if missing:
+    raise RuntimeError(
+        "visualizaciones_complementarias.py requiere ejecutar proyecto_peliculas_ml.py "
+        "y seccion_series_tiempo.py en el mismo intérprete antes de usarlo. "
+        f"Variables faltantes: {', '.join(missing)}"
+    )
+ 
 def layout_base(fig, title, subtitle="", height=460):
     fig.update_layout(
         title=dict(
