@@ -376,7 +376,8 @@ sarima_model = SARIMAX(
     enforce_invertibility=False
 ).fit(disp=False)
 
-sarima_fc  = sarima_model.get_forecast(steps=HORIZON)
+forecast_steps = len(test_ts)
+sarima_fc  = sarima_model.get_forecast(steps=forecast_steps)
 sarima_pred = pd.Series(sarima_fc.predicted_mean.values, index=test_ts.index)
 sarima_ci   = sarima_fc.conf_int()
 
@@ -406,15 +407,16 @@ prophet_model = Prophet(
 )
 prophet_model.fit(prophet_train)
 
-future = prophet_model.make_future_dataframe(periods=HORIZON, freq="MS")
+forecast_steps = len(test_ts)
+future = prophet_model.make_future_dataframe(periods=forecast_steps, freq="MS")
 forecast = prophet_model.predict(future)
 
 prophet_pred = pd.Series(
-    forecast.set_index("ds")["yhat"].tail(HORIZON).values,
+    forecast.set_index("ds")["yhat"].tail(forecast_steps).values,
     index=test_ts.index
 )
-prophet_lower = forecast.set_index("ds")["yhat_lower"].tail(HORIZON).values
-prophet_upper = forecast.set_index("ds")["yhat_upper"].tail(HORIZON).values
+prophet_lower = forecast.set_index("ds")["yhat_lower"].tail(forecast_steps).values
+prophet_upper = forecast.set_index("ds")["yhat_upper"].tail(forecast_steps).values
 
 predicciones["Prophet"] = prophet_pred
 resultados_ts.append(metricas_ts(test_ts, prophet_pred, "Prophet"))
