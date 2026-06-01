@@ -990,48 +990,85 @@ print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html
 # ════════════════════════════════════════════════════════════
 #  SECCIÓN 4 — CONCLUSIONES
 # ════════════════════════════════════════════════════════════
-
+ 
 top3 = importancia.head(3).index.tolist()
-
+ 
 print("=" * 62)
 print("   SECCIÓN 4 — HALLAZGOS, LIMITACIONES Y RECOMENDACIÓN")
 print("=" * 62)
+# Obtener R² por segmento del mejor modelo
+segs_mejor = mejor["segs"]
+ 
 print(f"""
 ¿QUÉ ENCONTRAMOS?
 ─────────────────
 El modelo {mejor['model']} explica el {mejor['r2']*100:.1f}% de la varianza
 en la popularidad (log) de películas TMDB.
-
+ 
 Variables más determinantes (SHAP):
-  1. {top3[0]}   → Motor principal de popularidad
-  2. {top3[1]}  → Proxy de alcance de distribución
-  3. {top3[2]}  → Escala y ambición de producción
-
-La calidad (vote_average) tiene impacto sorprendentemente bajo,
-lo que revela que la popularidad es un fenómeno de MASA, no de
-calidad: se necesita llegar a mucha gente, no solo gustarles.
-
-LIMITACIONES
-────────────
+  1. {top3[0]}   → Motor principal: el engagement (votar) retroalimenta la popularidad.
+  2. {top3[1]}  → Alcance de distribución global y marketing.
+  3. {top3[2]}  → Escala de producción y acceso a plataformas.
+ 
+La calidad (vote_average) tiene impacto sorprendentemente bajo.
+La popularidad es un fenómeno de MASA, no de calidad.
+ 
+⚠️  MATIZ IMPORTANTE — R² por segmento:
+  El R² global de {mejor['r2']:.3f} esconde una asimetría crítica:
+  • Popularidad baja  (p0-33) : R² ≈ {segs_mejor.get('bajo (p0-33)', 0):.3f}  ← predice bien
+  • Popularidad media (p33-66): R² ≈ {segs_mejor.get('medio (p33-66)', 0):.3f}  ← predice bien
+  • Popularidad alta  (p66-100): R² ≈ {segs_mejor.get('alto (p66-100)', 0):.3f}  ← predice peor
+  El modelo falla exactamente donde más importa para la industria.
+  Las películas virales y franquicias son las peor predichas.
+ 
+HALLAZGO DE SERIES DE TIEMPO (conecta con Sección 5):
+  El análisis temporal confirma estacionalidad real: junio-julio y
+  diciembre tienen ~15-20% más revenue que la base anual.
+  Esto implica que el MES DE ESTRENO es una variable relevante que
+  el modelo de regresión actual NO tiene como feature.
+  Añadir release_month podría mejorar el R² en el segmento alto.
+ 
+HALLAZGO DE ROI (VIZ-C1):
+  Horror y Thriller tienen los mejores ROI con presupuesto bajo.
+  La relación budget→popularidad no es universal — depende del género.
+ 
+LIMITACIONES ACTUALIZADAS
+──────────────────────────
   1. Budget con muchos ceros no reportados → ruido en log_budget.
-  2. Popularidad TMDB es dinámica; valores históricos pueden estar
-     desactualizados respecto al momento real de máxima visibilidad.
-  3. Sin datos de elenco, director ni plataforma de distribución,
-     variables que probablemente tienen alto poder predictivo.
-  4. Dataset hasta ~2017; el streaming post-2019 cambió radicalmente
-     los patrones de popularidad (series vs. películas).
-
+  2. Popularidad TMDB es un snapshot dinámico — el modelo confunde
+     "bajo vote_count al momento del snapshot" con "película impopular",
+     cuando puede ser una película recién estrenada (limitación estructural).
+  3. Sin datos de elenco, director, plataforma ni release_month.
+     Estas variables explicarían gran parte del error en el segmento alto.
+  4. Dataset hasta ~2017. El streaming post-2019 (Netflix, Disney+)
+     cambió radicalmente los patrones de popularidad.
+  5. ETS Multiplicative > Additive en series de tiempo → la amplitud
+     estacional crece con el nivel, algo que el modelo de regresión
+     tampoco captura sin release_month como feature.
+ 
 RECOMENDACIÓN CONCRETA
 ──────────────────────
 Para maximizar popularidad: invertir en DISTRIBUCIÓN y ENGAGEMENT
 antes que en presupuesto de producción puro.
-
+ 
   ✅ Estrategia ganadora:
-     Asegurar estreno simultáneo en múltiples mercados (→ revenue alto)
-     + campaña activa de reseñas y ratings tempranos (→ vote_count alto)
+     • Estreno en junio-julio o diciembre (ventaja estacional confirmada)
+     • Distribución simultánea en múltiples mercados (→ revenue alto)
+     • Campaña activa de ratings tempranos (→ vote_count alto)
      = efecto multiplicador según el modelo.
-
+ 
+  ✅ Por género:
+     • Acción/Aventura: mejor popularidad media pero alto presupuesto.
+     • Horror/Thriller: mejor ROI con presupuesto bajo — oportunidad
+       para productoras independientes.
+ 
   ⚠️  Trampa a evitar:
      Producción costosa sin distribución amplia tiene menor ROI
-     en popularidad que una producción modesta con distribución global.
+     en popularidad que una producción modesta bien distribuida.
+     El modelo confirma que presupuesto sin votos = invisibilidad.
+ 
+  🔧 Mejora pendiente para el modelo:
+     Añadir release_month como feature categórica. El análisis de
+     series de tiempo demuestra que el mes de estreno tiene un efecto
+     multiplicativo del 15-20% sobre el revenue esperado.
 """)
