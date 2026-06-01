@@ -385,41 +385,62 @@ predicciones["SARIMA"] = sarima_pred
 resultados_ts.append(metricas_ts(test_ts, sarima_pred, "SARIMA"))
 
 # ── MODELO 3: Prophet ────────────────────────────────────────
+prophet_pred = None
+prophet_model = None
+prophet_import_error = None
+
 try:
     from prophet import Prophet
 except ImportError:
-    from fbprophet import Prophet
+    try:
+        from fbprophet import Prophet
+    except Exception as e:
+        Prophet = None
+        prophet_import_error = e
+except Exception as e:
+    Prophet = None
+    prophet_import_error = e
 
-print("\n⏳  Ajustando Prophet…")
+if Prophet is None:
+    print("\n⚠️  Prophet no está disponible en este entorno. Se omite el modelo Prophet.")
+    if prophet_import_error is not None:
+        print(f"    Detalle: {prophet_import_error}")
+else:
+    print("\n⏳  Ajustando Prophet…")
 
-prophet_train = pd.DataFrame({
-    "ds": train_ts.index,
-    "y":  train_ts.values
-})
+    prophet_train = pd.DataFrame({
+        "ds": train_ts.index,
+        "y":  train_ts.values
+    })
 
-prophet_model = Prophet(
-    seasonality_mode="multiplicative",   # más apropiado para series con tendencia
-    yearly_seasonality=True,
-    weekly_seasonality=False,
-    daily_seasonality=False,
-    changepoint_prior_scale=0.05,        # regularización de la tendencia
-    interval_width=0.95
-)
-prophet_model.fit(prophet_train)
+    try:
+        prophet_model = Prophet(
+            seasonality_mode="multiplicative",   # más apropiado para series con tendencia
+            yearly_seasonality=True,
+            weekly_seasonality=False,
+            daily_seasonality=False,
+            changepoint_prior_scale=0.05,        # regularización de la tendencia
+            interval_width=0.95,
+            stan_backend="CMDSTANPY"
+        )
+        prophet_model.fit(prophet_train)
 
-forecast_steps = len(test_ts)
-future = prophet_model.make_future_dataframe(periods=forecast_steps, freq="MS")
-forecast = prophet_model.predict(future)
+        forecast_steps = len(test_ts)
+        future = prophet_model.make_future_dataframe(periods=forecast_steps, freq="MS")
+        forecast = prophet_model.predict(future)
 
-prophet_pred = pd.Series(
-    forecast.set_index("ds")["yhat"].tail(forecast_steps).values,
-    index=test_ts.index
-)
-prophet_lower = forecast.set_index("ds")["yhat_lower"].tail(forecast_steps).values
-prophet_upper = forecast.set_index("ds")["yhat_upper"].tail(forecast_steps).values
+        prophet_pred = pd.Series(
+            forecast.set_index("ds")["yhat"].tail(forecast_steps).values,
+            index=test_ts.index
+        )
+        prophet_lower = forecast.set_index("ds")["yhat_lower"].tail(forecast_steps).values
+        prophet_upper = forecast.set_index("ds")["yhat_upper"].tail(forecast_steps).values
 
-predicciones["Prophet"] = prophet_pred
-resultados_ts.append(metricas_ts(test_ts, prophet_pred, "Prophet"))
+        predicciones["Prophet"] = prophet_pred
+        resultados_ts.append(metricas_ts(test_ts, prophet_pred, "Prophet"))
+    except Exception as e:
+        print("\n⚠️  No se pudo ajustar Prophet en este entorno. Se omite el modelo Prophet.")
+        print(f"    Detalle: {type(e).__name__}: {e}")
 
 print(f"\n{'='*62}")
 print("  Resumen de métricas — test set (2016–2017)")
