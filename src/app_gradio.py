@@ -27,6 +27,9 @@ import os
 
 warnings.filterwarnings("ignore")
 
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+DEFAULT_CSV_PATH = os.path.join(BASE_DIR, "data", "movies_metadata.csv")
+
 # ── Constantes ───────────────────────────────────────────────
 TOP_GENRES = ["Drama","Comedy","Thriller","Action",
               "Romance","Horror","Crime","Adventure"]
@@ -42,7 +45,7 @@ NIVEL_EMOJIS = ["🥶","😐","🙂","🔥","🚀","🌟"]
 #  ENTRENAMIENTO (se ejecuta al iniciar la app)
 # ════════════════════════════════════════════════════════════
 
-def entrenar_modelo(csv_path="data/movies_metadata.csv"):
+def entrenar_modelo(csv_path=DEFAULT_CSV_PATH):
     df = pd.read_csv(csv_path, low_memory=False)
     movies = df[["title","budget","revenue","runtime",
                  "vote_average","vote_count","popularity","genres"]].copy()
@@ -435,7 +438,7 @@ with gr.Blocks(css=CSS, title="🎬 Movie Popularity Predictor") as demo:
 
 if __name__ == "__main__":
     demo.launch(
-        share=True,          # True para generar link público temporal
+        share=False,
         server_port=7860,
         show_error=True
     )

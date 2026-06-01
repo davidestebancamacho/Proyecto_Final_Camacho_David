@@ -23,6 +23,7 @@ plotly==5.22.0
 
 # App interactiva
 gradio==4.36.1
+huggingface-hub==0.16.4
 
 # Utilidades
 ast-decompiler==0.7.0  # parseo de JSON embebido en TMDB
