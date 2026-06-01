@@ -353,27 +353,33 @@ best_prophet_name  = None
 best_prophet_model = None
 best_prophet_pred  = None
  
-for p_name, p_params in prophet_configs:
-    try:
-        pm = Prophet(**p_params, interval_width=0.95)
-        pm.fit(prophet_train_df)
-        future  = pm.make_future_dataframe(periods=HORIZON, freq="MS")
-        fc      = pm.predict(future)
-        p_pred  = pd.Series(fc.set_index("ds")["yhat"].tail(HORIZON).values,
-                            index=test_ts.index)
-        p_res   = metricas_ts(test_ts, p_pred, p_name)
-        resultados_ts.append(p_res)
-        predicciones[p_name] = p_pred
-        if p_res["mape"] < best_prophet_mape:
-            best_prophet_mape  = p_res["mape"]
-            best_prophet_name  = p_name
-            best_prophet_model = pm
-            best_prophet_pred  = p_pred
-            prophet_fc_best    = fc
-    except Exception as e:
-        print(f"    {p_name}: error — {e}")
+if Prophet is not None:
+    for p_name, p_params in prophet_configs:
+        try:
+            pm = Prophet(**p_params, interval_width=0.95)
+            pm.fit(prophet_train_df)
+            future  = pm.make_future_dataframe(periods=HORIZON, freq="MS")
+            fc      = pm.predict(future)
+            p_pred  = pd.Series(fc.set_index("ds")["yhat"].tail(HORIZON).values,
+                                index=test_ts.index)
+            p_res   = metricas_ts(test_ts, p_pred, p_name)
+            resultados_ts.append(p_res)
+            predicciones[p_name] = p_pred
+            if p_res["mape"] < best_prophet_mape:
+                best_prophet_mape  = p_res["mape"]
+                best_prophet_name  = p_name
+                best_prophet_model = pm
+                best_prophet_pred  = p_pred
+                prophet_fc_best    = fc
+        except Exception as e:
+            print(f"    {p_name}: error — {e}")
+else:
+    print("  ⚠️  Prophet no disponible — se omiten los modelos Prophet")
  
-print(f"  Mejor Prophet: {best_prophet_name} (MAPE={best_prophet_mape:.1f}%)")
+if best_prophet_name is None:
+    print("  Mejor Prophet: ninguno (Prophet no fue ejecutado o falló en todas las configuraciones)")
+else:
+    print(f"  Mejor Prophet: {best_prophet_name} (MAPE={best_prophet_mape:.1f}%)")
  
 # ════════════════════════════════════════════════════════════
 #  PASO 6 — VISUALIZACIONES
