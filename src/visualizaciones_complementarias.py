@@ -37,18 +37,6 @@ if "GENRE_COLS" not in dir():
 if "FEATURES_RAW" not in dir():
     FEATURES_RAW = NUM_CONT + TOP_GENRES
  
-# ── Constantes necesarias (definidas aquí para ejecución standalone) ──
-# Si se ejecuta después de proyecto_peliculas_ml.py estas ya existen.
-if "TOP_GENRES" not in dir():
-    TOP_GENRES  = ["Drama","Comedy","Thriller","Action",
-                   "Romance","Horror","Crime","Adventure"]
-if "NUM_CONT" not in dir():
-    NUM_CONT    = ["budget","revenue","runtime","vote_average","vote_count"]
-if "GENRE_COLS" not in dir():
-    GENRE_COLS  = TOP_GENRES
-if "FEATURES_RAW" not in dir():
-    FEATURES_RAW = NUM_CONT + TOP_GENRES
- 
 DARK_BG   = "#0D1117"
 PANEL_BG  = "#161B22"
 TEXT_COL  = "#C9D1D9"
