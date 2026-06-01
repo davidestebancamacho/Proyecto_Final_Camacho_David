@@ -41,7 +41,7 @@ print("""
 try:
     _ = df
 except NameError:
-    df = pd.read_csv("movies_metadata.csv", low_memory=False)
+    df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
 
 ts_raw = df[["release_date", "revenue"]].copy()
 ts_raw["revenue"] = pd.to_numeric(ts_raw["revenue"], errors="coerce")
