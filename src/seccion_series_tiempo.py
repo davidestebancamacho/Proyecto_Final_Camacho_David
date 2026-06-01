@@ -298,16 +298,17 @@ fig_ts3.show()
 #  PASO 4 — MODELOS Y ENTRENAMIENTO
 # ════════════════════════════════════════════════════════════
 
-# Split principal: train hasta 2015-12, test = 2016 y 2017 (24 meses)
+# Split principal: train hasta 2015-12, test = 2016-2017 (ajustado a datos disponibles)
 CUTOFF   = "2015-12"
-HORIZON  = 24    # 2 años para tener más masa de evaluación
 
 train_ts = ts["revenue_medio"][:"2015-12"]
 test_ts  = ts["revenue_medio"]["2016-01":"2017-12"]
+HORIZON  = len(test_ts)    # número real de meses disponibles en el conjunto de prueba
 
 print(f"\nSplit principal:")
 print(f"  Train: {train_ts.index[0].date()} → {train_ts.index[-1].date()}  ({len(train_ts)} obs)")
 print(f"  Test:  {test_ts.index[0].date()}  → {test_ts.index[-1].date()}   ({len(test_ts)} obs)")
+print(f"  Horizonte real: h = {HORIZON} meses")
 
 # ── Métricas ─────────────────────────────────────────────────
 def metricas_ts(y_true, y_pred, nombre=""):
@@ -378,16 +379,22 @@ sarima_model = SARIMAX(
 
 forecast_steps = len(test_ts)
 sarima_fc  = sarima_model.get_forecast(steps=forecast_steps)
-sarima_pred = pd.Series(sarima_fc.predicted_mean.values, index=test_ts.index)
-sarima_ci   = sarima_fc.conf_int()
+try:
+    sarima_pred = sarima_fc.predicted_mean.loc[test_ts.index]
+    sarima_ci   = sarima_fc.conf_int().loc[test_ts.index]
+except Exception:
+    sarima_pred = pd.Series(sarima_fc.predicted_mean.values[:forecast_steps], index=test_ts.index)
+    sarima_ci   = sarima_fc.conf_int().iloc[:forecast_steps]
 
 predicciones["SARIMA"] = sarima_pred
 resultados_ts.append(metricas_ts(test_ts, sarima_pred, "SARIMA"))
 
-# ── MODELO 3: Prophet ────────────────────────────────────────
+# ── MODELO 3: Prophet ──────────────────────────────────────
 prophet_pred = None
 prophet_model = None
 prophet_import_error = None
+prophet_lower = None
+prophet_upper = None
 
 try:
     from prophet import Prophet
@@ -490,7 +497,8 @@ fig_ts4.add_trace(go.Scatter(
 ))
 
 # Intervalo Prophet
-if 'Prophet' in predicciones and prophet_pred is not None:
+if ('Prophet' in predicciones and prophet_pred is not None and
+        prophet_lower is not None and prophet_upper is not None):
     fig_ts4.add_trace(go.Scatter(
         x=list(test_ts.index) + list(test_ts.index[::-1]),
         y=list(prophet_upper/1e6) + list(prophet_lower[::-1]/1e6),
