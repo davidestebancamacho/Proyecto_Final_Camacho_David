@@ -482,14 +482,13 @@ print(f"""
 # ════════════════════════════════════════════════════════════
 print("\n── VIZ-C6: Componentes Prophet ───────────────────────")
  
-# Guard: skip if Prophet was not available in the environment
 if globals().get("prophet_model") is None:
     print("  ⚠️  prophet_model no disponible — omitiendo VIZ-C6")
 else:
     try:
         prophet_train_full = pd.DataFrame({
             "ds": ts.index,
-            "y":  ts["revenue_medio"].values
+            "y": ts["revenue_medio"].values
         })
  
         prophet_full = prophet_model.__class__(
@@ -501,8 +500,8 @@ else:
             interval_width=0.95
         )
         prophet_full.fit(prophet_train_full)
-        future_full  = prophet_full.make_future_dataframe(periods=12, freq="MS")
-        fc_full      = prophet_full.predict(future_full)
+        future_full = prophet_full.make_future_dataframe(periods=12, freq="MS")
+        fc_full = prophet_full.predict(future_full)
  
         fig_c6 = make_subplots(rows=3, cols=1, shared_xaxes=True,
             subplot_titles=[
@@ -512,80 +511,77 @@ else:
             ],
             vertical_spacing=0.08)
  
-    fig_c6.add_trace(go.Scatter(
-        x=fc_full["ds"], y=fc_full["trend"] / 1e6,
-        mode="lines", line=dict(color="#3498db", width=2),
-        name="Trend",
-        hovertemplate="%{x|%b %Y}<br>Tendencia: $%{y:.1f}M<extra></extra>"
-    ), row=1, col=1)
+        fig_c6.add_trace(go.Scatter(
+            x=fc_full["ds"], y=fc_full["trend"] / 1e6,
+            mode="lines", line=dict(color="#3498db", width=2),
+            name="Trend",
+            hovertemplate="%{x|%b %Y}<br>Tendencia: $%{y:.1f}M<extra></extra>"
+        ), row=1, col=1)
  
-    # Puntos de cambio de tendencia
-    for cp in prophet_full.changepoints:
-        fig_c6.add_vline(x=cp, line_color="rgba(231,76,60,0.4)",
-                          line_width=1, row=1, col=1)
+        # Puntos de cambio de tendencia
+        for cp in prophet_full.changepoints:
+            fig_c6.add_vline(x=cp, line_color="rgba(231,76,60,0.4)",
+                              line_width=1, row=1, col=1)
  
-    # Estacionalidad anual (normalizada al valor máximo)
-    yearly = fc_full[["ds", "yearly"]].copy()
-    yearly["month"] = yearly["ds"].dt.month
-    monthly_effect  = yearly.groupby("month")["yearly"].mean()
-    meses = ["Ene","Feb","Mar","Abr","May","Jun",
-              "Jul","Ago","Sep","Oct","Nov","Dic"]
+        # Estacionalidad anual (normalizada al valor máximo)
+        yearly = fc_full[["ds", "yearly"]].copy()
+        yearly["month"] = yearly["ds"].dt.month
+        monthly_effect = yearly.groupby("month")["yearly"].mean()
+        meses = ["Ene","Feb","Mar","Abr","May","Jun",
+                 "Jul","Ago","Sep","Oct","Nov","Dic"]
  
-    fig_c6.add_trace(go.Bar(
-        x=meses, y=monthly_effect.values,
-        marker=dict(
-            color=monthly_effect.values,
-            colorscale="RdYlGn",
-            showscale=False
-        ),
-        name="Estacionalidad",
-        hovertemplate="%{x}<br>Efecto: %{y:.4f}<extra></extra>"
-    ), row=2, col=1)
-    fig_c6.add_hline(y=0, line_color="#7f8c8d",
-                      line_width=0.8, row=2, col=1)
+        fig_c6.add_trace(go.Bar(
+            x=meses, y=monthly_effect.values,
+            marker=dict(
+                color=monthly_effect.values,
+                colorscale="RdYlGn",
+                showscale=False
+            ),
+            name="Estacionalidad",
+            hovertemplate="%{x}<br>Efecto: %{y:.4f}<extra></extra>"
+        ), row=2, col=1)
+        fig_c6.add_hline(y=0, line_color="#7f8c8d",
+                          line_width=0.8, row=2, col=1)
  
-    # Pronóstico con banda
-    fig_c6.add_trace(go.Scatter(
-        x=list(fc_full["ds"]) + list(fc_full["ds"][::-1]),
-        y=list(fc_full["yhat_upper"]/1e6) + list(fc_full["yhat_lower"].values[::-1]/1e6),
-        fill="toself", fillcolor="rgba(46,204,113,0.12)",
-        line=dict(width=0), name="IC 95%", hoverinfo="skip"
-    ), row=3, col=1)
-    fig_c6.add_trace(go.Scatter(
-        x=fc_full["ds"], y=fc_full["yhat"] / 1e6,
-        mode="lines", line=dict(color="#2ecc71", width=2),
-        name="Pronóstico",
-        hovertemplate="%{x|%b %Y}<br>Pronóstico: $%{y:.1f}M<extra></extra>"
-    ), row=3, col=1)
-    fig_c6.add_trace(go.Scatter(
-        x=ts.index, y=ts["revenue_medio"] / 1e6,
-        mode="markers", marker=dict(color="#ffffff", size=3, opacity=0.5),
-        name="Real",
-        hovertemplate="%{x|%b %Y}<br>Real: $%{y:.1f}M<extra></extra>"
-    ), row=3, col=1)
-    fig_c6.add_vline(
-        x=pd.Timestamp("2018-01-01"),
-        line_dash="dash", line_color="#7f8c8d", line_width=1,
-        annotation_text="inicio pronóstico",
-        annotation_font_color="#7f8c8d",
-        row=3, col=1
-    )
+        # Pronóstico con banda
+        fig_c6.add_trace(go.Scatter(
+            x=list(fc_full["ds"]) + list(fc_full["ds"][::-1]),
+            y=list(fc_full["yhat_upper"]/1e6) + list(fc_full["yhat_lower"].values[::-1]/1e6),
+            fill="toself", fillcolor="rgba(46,204,113,0.12)",
+            line=dict(width=0), name="IC 95%", hoverinfo="skip"
+        ), row=3, col=1)
+        fig_c6.add_trace(go.Scatter(
+            x=fc_full["ds"], y=fc_full["yhat"] / 1e6,
+            mode="lines", line=dict(color="#2ecc71", width=2),
+            name="Pronóstico",
+            hovertemplate="%{x|%b %Y}<br>Pronóstico: $%{y:.1f}M<extra></extra>"
+        ), row=3, col=1)
+        fig_c6.add_trace(go.Scatter(
+            x=ts.index, y=ts["revenue_medio"] / 1e6,
+            mode="markers", marker=dict(color="#ffffff", size=3, opacity=0.5),
+            name="Real",
+            hovertemplate="%{x|%b %Y}<br>Real: $%{y:.1f}M<extra></extra>"
+        ), row=3, col=1)
+        fig_c6.add_vline(
+            x=pd.Timestamp("2018-01-01"),
+            line_dash="dash", line_color="#7f8c8d", line_width=1,
+            annotation_text="inicio pronóstico",
+            annotation_font_color="#7f8c8d",
+            row=3, col=1
+        )
  
-    layout_base(fig_c6,
-        "PROPHET — Descomposición de componentes",
-        "Las líneas verticales rojas en Trend = changepoints detectados automáticamente",
-        height=680)
-    fig_c6.update_yaxes(title_text="M USD", row=1, col=1)
-    fig_c6.update_yaxes(title_text="Efecto (multiplicativo)", row=2, col=1)
-    fig_c6.update_yaxes(title_text="M USD", row=3, col=1)
-    fig_c6.update_layout(showlegend=False)
-    fig_c6.show()
-    save(fig_c6, "viz_c6_prophet_descompuesto")
-    
-except Exception as e:
-    print(f"  ⚠️  VIZ-C6 falló: {e} — omitiendo Prophet descompuesto")
+        layout_base(fig_c6,
+            "PROPHET — Descomposición de componentes",
+            "Las líneas verticales rojas en Trend = changepoints detectados automáticamente",
+            height=680)
+        fig_c6.update_yaxes(title_text="M USD", row=1, col=1)
+        fig_c6.update_yaxes(title_text="Efecto (multiplicativo)", row=2, col=1)
+        fig_c6.update_yaxes(title_text="M USD", row=3, col=1)
+        fig_c6.update_layout(showlegend=False)
+        fig_c6.show()
+        save(fig_c6, "viz_c6_prophet_descompuesto")
  
-print("""
+        print("""
 📊 INTERPRETACIÓN — VIZ-C6 (Prophet descompuesto):
   TREND:
     Las líneas verticales son changepoints automáticos donde Prophet
@@ -602,6 +598,8 @@ print("""
     Prophet asume continuidad de la tendencia 2015-2017 — si el
     mercado cambia estructuralmente (streaming), el modelo fallará.
 """)
+    except Exception as e:
+        print(f"  ⚠️  VIZ-C6 falló: {e} — omitiendo Prophet descompuesto")
  
 # ════════════════════════════════════════════════════════════
 #  VIZ-C7 — Distribución de sample_weights por quintil
