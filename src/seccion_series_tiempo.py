@@ -490,13 +490,14 @@ fig_ts4.add_trace(go.Scatter(
 ))
 
 # Intervalo Prophet
-fig_ts4.add_trace(go.Scatter(
-    x=list(test_ts.index) + list(test_ts.index[::-1]),
-    y=list(prophet_upper/1e6) + list(prophet_lower[::-1]/1e6),
-    fill="toself", fillcolor="rgba(46,204,113,0.10)",
-    line=dict(width=0), name="IC 95% Prophet", showlegend=True,
-    hoverinfo="skip"
-))
+if 'Prophet' in predicciones and prophet_pred is not None:
+    fig_ts4.add_trace(go.Scatter(
+        x=list(test_ts.index) + list(test_ts.index[::-1]),
+        y=list(prophet_upper/1e6) + list(prophet_lower[::-1]/1e6),
+        fill="toself", fillcolor="rgba(46,204,113,0.10)",
+        line=dict(width=0), name="IC 95% Prophet", showlegend=True,
+        hoverinfo="skip"
+    ))
 
 colores_pred = {"Naive estacional":"#e74c3c", "SARIMA":"#f39c12", "Prophet":"#2ecc71"}
 for nombre, pred in predicciones.items():
