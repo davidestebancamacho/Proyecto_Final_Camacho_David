@@ -186,11 +186,12 @@ print("""
 # ════════════════════════════════════════════════════════════
 print("\nPASO 3 — Configurando validación walk-forward...")
  
-HORIZON = 24
 train_ts = ts["revenue_medio"][:"2015-12"]
 test_ts  = ts["revenue_medio"]["2016-01":"2017-12"]
+HORIZON = len(test_ts)
 print(f"  Train: {train_ts.index[0].date()} → {train_ts.index[-1].date()} ({len(train_ts)} obs)")
 print(f"  Test : {test_ts.index[0].date()}  → {test_ts.index[-1].date()}  ({len(test_ts)} obs)")
+print(f"  Horizonte real: {HORIZON} meses")
  
 # ── VIZ TS3 — Walk-forward visual ────────────────────────────
 fig_ts3 = go.Figure()
