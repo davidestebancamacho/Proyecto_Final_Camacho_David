@@ -17,6 +17,7 @@ shap==0.45.1
 # Series de tiempo
 statsmodels==0.14.2
 prophet==1.1.5
+pmdarima==2.2.0
 
 # Visualización
 plotly==5.22.0

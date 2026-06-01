@@ -483,33 +483,34 @@ print(f"""
 print("\n── VIZ-C6: Componentes Prophet ───────────────────────")
  
 # Guard: skip if Prophet was not available in the environment
-if 'prophet_model' not in globals() or prophet_model is None:
+if globals().get("prophet_model") is None:
     print("  ⚠️  prophet_model no disponible — omitiendo VIZ-C6")
 else:
-    prophet_train_full = pd.DataFrame({
-        "ds": ts.index,
-        "y":  ts["revenue_medio"].values
-    })
+    try:
+        prophet_train_full = pd.DataFrame({
+            "ds": ts.index,
+            "y":  ts["revenue_medio"].values
+        })
  
-    prophet_full = prophet_model.__class__(
-        seasonality_mode="multiplicative",
-        yearly_seasonality=True,
-        weekly_seasonality=False,
-        daily_seasonality=False,
-        changepoint_prior_scale=0.05,
-        interval_width=0.95
-    )
-    prophet_full.fit(prophet_train_full)
-    future_full  = prophet_full.make_future_dataframe(periods=12, freq="MS")
-    fc_full      = prophet_full.predict(future_full)
+        prophet_full = prophet_model.__class__(
+            seasonality_mode="multiplicative",
+            yearly_seasonality=True,
+            weekly_seasonality=False,
+            daily_seasonality=False,
+            changepoint_prior_scale=0.05,
+            interval_width=0.95
+        )
+        prophet_full.fit(prophet_train_full)
+        future_full  = prophet_full.make_future_dataframe(periods=12, freq="MS")
+        fc_full      = prophet_full.predict(future_full)
  
-    fig_c6 = make_subplots(rows=3, cols=1, shared_xaxes=True,
-        subplot_titles=[
-            "Tendencia (Trend) — crecimiento suavizado",
-            "Estacionalidad anual — efecto de cada mes",
-            "Pronóstico completo con IC 95%"
-        ],
-        vertical_spacing=0.08)
+        fig_c6 = make_subplots(rows=3, cols=1, shared_xaxes=True,
+            subplot_titles=[
+                "Tendencia (Trend) — crecimiento suavizado",
+                "Estacionalidad anual — efecto de cada mes",
+                "Pronóstico completo con IC 95%"
+            ],
+            vertical_spacing=0.08)
  
     fig_c6.add_trace(go.Scatter(
         x=fc_full["ds"], y=fc_full["trend"] / 1e6,
@@ -580,6 +581,9 @@ else:
     fig_c6.update_layout(showlegend=False)
     fig_c6.show()
     save(fig_c6, "viz_c6_prophet_descompuesto")
+    
+except Exception as e:
+    print(f"  ⚠️  VIZ-C6 falló: {e} — omitiendo Prophet descompuesto")
  
 print("""
 📊 INTERPRETACIÓN — VIZ-C6 (Prophet descompuesto):
