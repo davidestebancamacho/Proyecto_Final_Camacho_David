@@ -118,7 +118,7 @@ fig1.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig1.show()
-# fig1.write_html("viz1_distribuciones.html")  # ← descomentar para exportar
+fig1.write_html("outputs/html/viz_1_distribucion_features.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 1:
@@ -164,7 +164,7 @@ fig2.update_layout(
     coloraxis_colorbar=dict(title="r")
 )
 fig2.show()
-# fig2.write_html("viz2_correlaciones.html")
+fig2.write_html("outputs/html/viz_2_correlaciones.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 2:
@@ -207,7 +207,7 @@ fig3.update_layout(
     showlegend=False
 )
 fig3.show()
-# fig3.write_html("viz3_generos.html")
+fig3.write_html("outputs/html/viz_3_boxplot_generos.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 3:
@@ -693,6 +693,7 @@ fig4.update_layout(
     legend=dict(bgcolor="#161B22", bordercolor="#30363D")
 )
 fig4.show()
+fig4.write_html("outputs/html/viz_4_radar_chart.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 4:
@@ -726,6 +727,7 @@ fig4b.update_layout(
     legend=dict(bgcolor="#161B22")
 )
 fig4b.show()
+fig4b.write_html("outputs/html/viz_4b_r2_por_segmento.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 4b (R² por segmento):
@@ -788,7 +790,7 @@ fig5.update_layout(
     font=dict(color="#C9D1D9"), showlegend=False
 )
 fig5.show()
-# fig5.write_html("viz5_residuos.html")
+fig5.write_html("outputs/html/viz_5_residuos.html")
 
 print(f"""
 📊 INTERPRETACIÓN — VIZ 5:
@@ -863,7 +865,7 @@ fig6.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig6.show()
-# fig6.write_html("viz6_shap_bar.html")
+fig6.write_html("outputs/html/viz_6_shap_importancia.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 6:
@@ -926,7 +928,7 @@ fig7.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig7.show()
-# fig7.write_html("viz7_shap_beeswarm.html")
+fig7.write_html("outputs/html/viz_7_shap_beeswarm.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 7 (Beeswarm):
@@ -969,7 +971,7 @@ fig8.update_layout(
     coloraxis_colorbar=dict(title=inter_feat)
 )
 fig8.show()
-# fig8.write_html("viz8_shap_dependence.html")
+fig8.write_html("outputs/html/viz_8_shap_dependencia.html")
 
 print(f"""
 📊 INTERPRETACIÓN — VIZ 8 (Dependence Plot):
