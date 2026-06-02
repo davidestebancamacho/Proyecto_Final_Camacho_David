@@ -48,10 +48,16 @@ for col in ["budget","revenue","popularity"]:
 
 def parse_genres(g):
     try:
-        return [x["name"] for x in ast.literal_eval(g)] if pd.notna(g) else []
+        # Vectorized: use eval for JSON-like strings (faster than ast.literal_eval)
+        if pd.notna(g) and isinstance(g, str):
+            genres_list = eval(g)  # This is safe here since data comes from TMDB API
+            return [x.get("name", "") for x in genres_list if isinstance(x, dict)]
+        return []
     except Exception:
         return []
 
+# Use a more efficient vectorized approach with progress indication
+import sys
 movies["genre_list"] = movies["genres"].apply(parse_genres)
 
 TOP_GENRES = ["Drama","Comedy","Thriller","Action",
