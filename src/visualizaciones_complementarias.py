@@ -17,19 +17,8 @@
 #    VIZ-C8  Skewness antes/después de PowerTransformer (balanceo)
 # ============================================================
  
-import os
-import ast
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, FunctionTransformer, PowerTransformer
-from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import Ridge
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.utils.class_weight import compute_sample_weight
-from xgboost import XGBRegressor
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
@@ -47,146 +36,23 @@ if "GENRE_COLS" not in dir():
     GENRE_COLS   = TOP_GENRES
 if "FEATURES_RAW" not in dir():
     FEATURES_RAW = NUM_CONT + TOP_GENRES
-
-
-def parse_genres(g):
-    try:
-        return [x["name"] for x in ast.literal_eval(g)] if pd.notna(g) else []
-    except Exception:
-        return []
-
-
-def load_movies_and_df(csv_path="data/movies_metadata.csv"):
-    df = pd.read_csv(csv_path, low_memory=False)
-    movies = df[["title","budget","revenue","runtime",
-                 "vote_average","vote_count","popularity","genres"]].copy()
-    for col in ["budget","revenue","popularity"]:
-        movies[col] = pd.to_numeric(movies[col], errors="coerce")
-    movies["genre_list"] = movies["genres"].apply(parse_genres)
-    for g in TOP_GENRES:
-        movies[g] = movies["genre_list"].apply(lambda lst: int(g in lst))
-    movies = movies.dropna(subset=["popularity"])
-    for col in ["budget","revenue"]:
-        movies[col] = movies[col].replace(0, np.nan)
-    movies.drop_duplicates(subset=["title"], inplace=True)
-    movies["log_popularity"] = np.log1p(movies["popularity"])
-    movies["_log_votes"] = np.log1p(movies["vote_count"].fillna(0))
-    movies["_log_popularity"] = movies["log_popularity"]
-    return df, movies
-
-
-def build_ml_components(movies):
-    X = movies[FEATURES_RAW]
-    y = movies["log_popularity"]
-    pop_bins = pd.qcut(y, q=5, labels=False)
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=pop_bins
-    )
-    pt_target = PowerTransformer(method="yeo-johnson", standardize=False)
-    y_train_pt = pt_target.fit_transform(y_train.values.reshape(-1,1)).ravel()
-    sample_weights = compute_sample_weight(
-        class_weight="balanced",
-        y=pd.qcut(y_train, q=5, labels=False)
-    )
-
-    numeric_transformer = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("log", FunctionTransformer(np.log1p, validate=True)),
-        ("power", PowerTransformer(method="yeo-johnson")),
-        ("scaler", StandardScaler()),
-    ])
-    genre_transformer = Pipeline([("scaler", StandardScaler())])
-    preprocessor = ColumnTransformer([
-        ("num", numeric_transformer, NUM_CONT),
-        ("genre", genre_transformer, GENRE_COLS),
-    ])
-
-    pipe_cache = {}
-
-    def get_base_pipe(model_name="XGBoost"):
-        if model_name in pipe_cache:
-            return pipe_cache[model_name]
-
-        if model_name == "XGBoost":
-            model = XGBRegressor(learning_rate=0.05, subsample=0.8,
-                                 colsample_bytree=0.8, random_state=42,
-                                 verbosity=0)
-        elif model_name == "RandomForest":
-            model = RandomForestRegressor(n_estimators=200, n_jobs=-1, random_state=42)
-        else:
-            model = Ridge()
-
-        pipe = Pipeline([
-            ("prep", preprocessor),
-            ("m", model)
-        ])
-        pipe.fit(X_train, y_train_pt)
-        pipe_cache[model_name] = pipe
-        return pipe
-
-    mejor = "XGBoost"
-    return X_test, y_test, y_train, pt_target, sample_weights, get_base_pipe, mejor
-
-
-REQUIRED_EXTERNAL = [
-    "movies", "df", "X_test", "y_test", "pt_target",
-    "get_base_pipe", "mejor", "sample_weights", "y_train",
-    "ts", "sarima_model"
-]
-missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
-if missing:
-    print("⚠️  Variables faltantes en memoria — cargando datos y entrenando componentes básicos...")
-    df, movies = load_movies_and_df()
-    X_test, y_test, y_train, pt_target, sample_weights, get_base_pipe, mejor = build_ml_components(movies)
-    ts = None
-    try:
-        ts_raw = df[["release_date","revenue"]].copy()
-        ts_raw["revenue"] = pd.to_numeric(ts_raw["revenue"], errors="coerce")
-        ts_raw["release_date"] = pd.to_datetime(ts_raw["release_date"], errors="coerce")
-        ts_raw = ts_raw[(ts_raw["revenue"] > 0)].dropna()
-        ts_raw = ts_raw[(ts_raw["release_date"].dt.year >= 1990) &
-                        (ts_raw["release_date"].dt.year <= 2017)]
-        ts_raw["month"] = ts_raw["release_date"].dt.to_period("M")
-        ts = (ts_raw.groupby("month")["revenue"]
-              .agg(revenue_medio="mean", n_peliculas="count")
-              .reset_index())
-        ts["month"] = ts["month"].dt.to_timestamp()
-        ts = ts.set_index("month").sort_index().asfreq("MS")
-        ts["revenue_medio"] = ts["revenue_medio"].interpolate(method="time")
-        ts["n_peliculas"] = ts["n_peliculas"].fillna(0).astype(int)
-    except Exception as e:
-        raise RuntimeError(f"No se pudo construir la serie temporal: {e}")
-
-    if "sarima_model" not in globals():
-        from statsmodels.tsa.arima.model import ARIMA
-        sarima_model = ARIMA(ts["revenue_medio"], order=(1,1,1), seasonal_order=(1,1,1,12)).fit()
-        print("⚠️  Se entrenó un SARIMA básico porque sarima_model no estaba disponible.")
-
-    missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
-    if missing:
-        raise RuntimeError(
-            "visualizaciones_complementarias.py requiere ejecutar proyecto_peliculas_ml.py "
-            "y seccion_series_tiempo.py en el mismo intérprete antes de usarlo, o tener acceso a data/movies_metadata.csv. "
-            f"Variables faltantes después de la carga: {', '.join(missing)}"
-        )
+ 
+# ── Constantes necesarias (definidas aquí para ejecución standalone) ──
+# Si se ejecuta después de proyecto_peliculas_ml.py estas ya existen.
+if "TOP_GENRES" not in dir():
+    TOP_GENRES  = ["Drama","Comedy","Thriller","Action",
+                   "Romance","Horror","Crime","Adventure"]
+if "NUM_CONT" not in dir():
+    NUM_CONT    = ["budget","revenue","runtime","vote_average","vote_count"]
+if "GENRE_COLS" not in dir():
+    GENRE_COLS  = TOP_GENRES
+if "FEATURES_RAW" not in dir():
+    FEATURES_RAW = NUM_CONT + TOP_GENRES
  
 DARK_BG   = "#0D1117"
 PANEL_BG  = "#161B22"
 TEXT_COL  = "#C9D1D9"
 GRID_COL  = "rgba(255,255,255,0.06)"
- 
-REQUIRED_EXTERNAL = [
-    "movies", "df", "X_test", "y_test", "pt_target",
-    "get_base_pipe", "mejor", "sample_weights", "y_train",
-    "ts", "sarima_model"
-]
-missing = [name for name in REQUIRED_EXTERNAL if name not in globals()]
-if missing:
-    raise RuntimeError(
-        "visualizaciones_complementarias.py requiere ejecutar proyecto_peliculas_ml.py "
-        "y seccion_series_tiempo.py en el mismo intérprete antes de usarlo. "
-        f"Variables faltantes: {', '.join(missing)}"
-    )
  
 def layout_base(fig, title, subtitle="", height=460):
     fig.update_layout(
@@ -616,106 +482,109 @@ print(f"""
 # ════════════════════════════════════════════════════════════
 print("\n── VIZ-C6: Componentes Prophet ───────────────────────")
  
-if globals().get("prophet_model") is None:
+# Guard: skip if Prophet was not available in the environment
+if 'prophet_model' not in dir() or prophet_model is None:
     print("  ⚠️  prophet_model no disponible — omitiendo VIZ-C6")
 else:
-    try:
-        prophet_train_full = pd.DataFrame({
-            "ds": ts.index,
-            "y": ts["revenue_medio"].values
-        })
+ _run_c6 = True
  
-        prophet_full = prophet_model.__class__(
-            seasonality_mode="multiplicative",
-            yearly_seasonality=True,
-            weekly_seasonality=False,
-            daily_seasonality=False,
-            changepoint_prior_scale=0.05,
-            interval_width=0.95
-        )
-        prophet_full.fit(prophet_train_full)
-        future_full = prophet_full.make_future_dataframe(periods=12, freq="MS")
-        fc_full = prophet_full.predict(future_full)
+if 'prophet_model' in dir() and prophet_model is not None:
+    prophet_train_full = pd.DataFrame({
+    "ds": ts.index,
+    "y":  ts["revenue_medio"].values
+})
  
-        fig_c6 = make_subplots(rows=3, cols=1, shared_xaxes=True,
-            subplot_titles=[
-                "Tendencia (Trend) — crecimiento suavizado",
-                "Estacionalidad anual — efecto de cada mes",
-                "Pronóstico completo con IC 95%"
-            ],
-            vertical_spacing=0.08)
+prophet_full = prophet_model.__class__(
+    seasonality_mode="multiplicative",
+    yearly_seasonality=True,
+    weekly_seasonality=False,
+    daily_seasonality=False,
+    changepoint_prior_scale=0.05,
+    interval_width=0.95
+)
+prophet_full.fit(prophet_train_full)
+future_full  = prophet_full.make_future_dataframe(periods=12, freq="MS")
+fc_full      = prophet_full.predict(future_full)
  
-        fig_c6.add_trace(go.Scatter(
-            x=fc_full["ds"], y=fc_full["trend"] / 1e6,
-            mode="lines", line=dict(color="#3498db", width=2),
-            name="Trend",
-            hovertemplate="%{x|%b %Y}<br>Tendencia: $%{y:.1f}M<extra></extra>"
-        ), row=1, col=1)
+fig_c6 = make_subplots(rows=3, cols=1, shared_xaxes=True,
+    subplot_titles=[
+        "Tendencia (Trend) — crecimiento suavizado",
+        "Estacionalidad anual — efecto de cada mes",
+        "Pronóstico completo con IC 95%"
+    ],
+    vertical_spacing=0.08)
  
-        # Puntos de cambio de tendencia
-        for cp in prophet_full.changepoints:
-            fig_c6.add_vline(x=cp, line_color="rgba(231,76,60,0.4)",
-                              line_width=1, row=1, col=1)
+fig_c6.add_trace(go.Scatter(
+    x=fc_full["ds"], y=fc_full["trend"] / 1e6,
+    mode="lines", line=dict(color="#3498db", width=2),
+    name="Trend",
+    hovertemplate="%{x|%b %Y}<br>Tendencia: $%{y:.1f}M<extra></extra>"
+), row=1, col=1)
  
-        # Estacionalidad anual (normalizada al valor máximo)
-        yearly = fc_full[["ds", "yearly"]].copy()
-        yearly["month"] = yearly["ds"].dt.month
-        monthly_effect = yearly.groupby("month")["yearly"].mean()
-        meses = ["Ene","Feb","Mar","Abr","May","Jun",
-                 "Jul","Ago","Sep","Oct","Nov","Dic"]
+# Puntos de cambio de tendencia
+for cp in prophet_full.changepoints:
+    fig_c6.add_vline(x=cp, line_color="rgba(231,76,60,0.4)",
+                      line_width=1, row=1, col=1)
  
-        fig_c6.add_trace(go.Bar(
-            x=meses, y=monthly_effect.values,
-            marker=dict(
-                color=monthly_effect.values,
-                colorscale="RdYlGn",
-                showscale=False
-            ),
-            name="Estacionalidad",
-            hovertemplate="%{x}<br>Efecto: %{y:.4f}<extra></extra>"
-        ), row=2, col=1)
-        fig_c6.add_hline(y=0, line_color="#7f8c8d",
-                          line_width=0.8, row=2, col=1)
+# Estacionalidad anual (normalizada al valor máximo)
+yearly = fc_full[["ds", "yearly"]].copy()
+yearly["month"] = yearly["ds"].dt.month
+monthly_effect  = yearly.groupby("month")["yearly"].mean()
+meses = ["Ene","Feb","Mar","Abr","May","Jun",
+          "Jul","Ago","Sep","Oct","Nov","Dic"]
  
-        # Pronóstico con banda
-        fig_c6.add_trace(go.Scatter(
-            x=list(fc_full["ds"]) + list(fc_full["ds"][::-1]),
-            y=list(fc_full["yhat_upper"]/1e6) + list(fc_full["yhat_lower"].values[::-1]/1e6),
-            fill="toself", fillcolor="rgba(46,204,113,0.12)",
-            line=dict(width=0), name="IC 95%", hoverinfo="skip"
-        ), row=3, col=1)
-        fig_c6.add_trace(go.Scatter(
-            x=fc_full["ds"], y=fc_full["yhat"] / 1e6,
-            mode="lines", line=dict(color="#2ecc71", width=2),
-            name="Pronóstico",
-            hovertemplate="%{x|%b %Y}<br>Pronóstico: $%{y:.1f}M<extra></extra>"
-        ), row=3, col=1)
-        fig_c6.add_trace(go.Scatter(
-            x=ts.index, y=ts["revenue_medio"] / 1e6,
-            mode="markers", marker=dict(color="#ffffff", size=3, opacity=0.5),
-            name="Real",
-            hovertemplate="%{x|%b %Y}<br>Real: $%{y:.1f}M<extra></extra>"
-        ), row=3, col=1)
-        fig_c6.add_vline(
-            x=pd.Timestamp("2018-01-01"),
-            line_dash="dash", line_color="#7f8c8d", line_width=1,
-            annotation_text="inicio pronóstico",
-            annotation_font_color="#7f8c8d",
-            row=3, col=1
-        )
+fig_c6.add_trace(go.Bar(
+    x=meses, y=monthly_effect.values,
+    marker=dict(
+        color=monthly_effect.values,
+        colorscale="RdYlGn",
+        showscale=False
+    ),
+    name="Estacionalidad",
+    hovertemplate="%{x}<br>Efecto: %{y:.4f}<extra></extra>"
+), row=2, col=1)
+fig_c6.add_hline(y=0, line_color="#7f8c8d",
+                  line_width=0.8, row=2, col=1)
  
-        layout_base(fig_c6,
-            "PROPHET — Descomposición de componentes",
-            "Las líneas verticales rojas en Trend = changepoints detectados automáticamente",
-            height=680)
-        fig_c6.update_yaxes(title_text="M USD", row=1, col=1)
-        fig_c6.update_yaxes(title_text="Efecto (multiplicativo)", row=2, col=1)
-        fig_c6.update_yaxes(title_text="M USD", row=3, col=1)
-        fig_c6.update_layout(showlegend=False)
-        fig_c6.show()
-        save(fig_c6, "viz_c6_prophet_descompuesto")
+# Pronóstico con banda
+fig_c6.add_trace(go.Scatter(
+    x=list(fc_full["ds"]) + list(fc_full["ds"][::-1]),
+    y=list(fc_full["yhat_upper"]/1e6) + list(fc_full["yhat_lower"].values[::-1]/1e6),
+    fill="toself", fillcolor="rgba(46,204,113,0.12)",
+    line=dict(width=0), name="IC 95%", hoverinfo="skip"
+), row=3, col=1)
+fig_c6.add_trace(go.Scatter(
+    x=fc_full["ds"], y=fc_full["yhat"] / 1e6,
+    mode="lines", line=dict(color="#2ecc71", width=2),
+    name="Pronóstico",
+    hovertemplate="%{x|%b %Y}<br>Pronóstico: $%{y:.1f}M<extra></extra>"
+), row=3, col=1)
+fig_c6.add_trace(go.Scatter(
+    x=ts.index, y=ts["revenue_medio"] / 1e6,
+    mode="markers", marker=dict(color="#ffffff", size=3, opacity=0.5),
+    name="Real",
+    hovertemplate="%{x|%b %Y}<br>Real: $%{y:.1f}M<extra></extra>"
+), row=3, col=1)
+fig_c6.add_vline(
+    x=pd.Timestamp("2018-01-01"),
+    line_dash="dash", line_color="#7f8c8d", line_width=1,
+    annotation_text="inicio pronóstico",
+    annotation_font_color="#7f8c8d",
+    row=3, col=1
+)
  
-        print("""
+layout_base(fig_c6,
+    "PROPHET — Descomposición de componentes",
+    "Las líneas verticales rojas en Trend = changepoints detectados automáticamente",
+    height=680)
+fig_c6.update_yaxes(title_text="M USD", row=1, col=1)
+fig_c6.update_yaxes(title_text="Efecto (multiplicativo)", row=2, col=1)
+fig_c6.update_yaxes(title_text="M USD", row=3, col=1)
+fig_c6.update_layout(showlegend=False)
+fig_c6.show()
+save(fig_c6, "viz_c6_prophet_descompuesto")
+ 
+print("""
 📊 INTERPRETACIÓN — VIZ-C6 (Prophet descompuesto):
   TREND:
     Las líneas verticales son changepoints automáticos donde Prophet
@@ -732,8 +601,6 @@ else:
     Prophet asume continuidad de la tendencia 2015-2017 — si el
     mercado cambia estructuralmente (streaming), el modelo fallará.
 """)
-    except Exception as e:
-        print(f"  ⚠️  VIZ-C6 falló: {e} — omitiendo Prophet descompuesto")
  
 # ════════════════════════════════════════════════════════════
 #  VIZ-C7 — Distribución de sample_weights por quintil
@@ -785,7 +652,10 @@ print("\n── VIZ-C8: Efecto del PowerTransformer ─────────�
  
 y_raw    = movies["popularity"].dropna()
 y_log    = np.log1p(y_raw)
-y_pt_all = pt_target.transform(y_log.values.reshape(-1,1)).ravel()
+# Note: PowerTransformer removed from target (causes negative R² in segments)
+# VIZ-C8 now shows: raw vs log1p — the transformation actually used
+from scipy.stats import skew as _skew
+y_pt_all = y_log.values  # same as log1p — no extra PT on target
  
 from scipy.stats import skew, kurtosis
  
@@ -799,7 +669,7 @@ fig_c8 = make_subplots(rows=1, cols=3,
     subplot_titles=[
         f"Raw  |  skew={skew(y_raw):.2f}",
         f"log1p  |  skew={skew(y_log):.2f}",
-        f"Yeo-Johnson  |  skew={skew(y_pt_all):.2f}"
+        f"log1p (usado)  |  skew={skew(y_pt_all):.2f}"
     ])
  
 data_list = [y_raw.clip(upper=500), y_log, y_pt_all]
@@ -808,13 +678,13 @@ for i, (data, col) in enumerate(zip(data_list, colors_d), 1):
     fig_c8.add_trace(go.Histogram(
         x=data, nbinsx=60,
         marker_color=col, opacity=0.8,
-        name=["Raw","log1p","Yeo-Johnson"][i-1],
+        name=["Raw popularity","log1p (target real)","log1p (confirmación)"][i-1],
         hovertemplate="Valor: %{x:.2f}<br>Count: %{y}<extra></extra>"
     ), row=1, col=i)
  
 layout_base(fig_c8,
-    "EFECTO DEL POWERTRANSFORMER — Reducción de sesgo en el target",
-    "La distribución verde (Yeo-Johnson) es la más cercana a normal — mejora el entrenamiento",
+    "TRANSFORMACIÓN DEL TARGET — Reducción de sesgo con log1p",
+    "log1p ya reduce skewness de ~21 a ~1.8 — suficiente para modelos de árbol (XGBoost, RF)",
     height=380)
 fig_c8.update_layout(showlegend=False)
 fig_c8.show()
@@ -822,19 +692,17 @@ save(fig_c8, "viz_c8_powertransformer")
  
 print(f"""
 📊 INTERPRETACIÓN — VIZ-C8:
-  • Raw popularity: skewness ~21 — completamente inutilizable como target.
-  • log1p: skewness ~{skew(y_log):.2f} — mucho mejor pero aún asimétrico.
-  • Yeo-Johnson: skewness ~{skew(y_pt_all):.2f} — aproximadamente normal.
+  • Raw popularity: skewness ~21 — inutilizable directamente como target.
+  • log1p: skewness ~{skew(y_log):.2f} — suficiente para XGBoost y RF.
+    Los modelos de árbol son invariantes a transformaciones monótonas
+    del target, por lo que log1p es la elección correcta.
  
-  Por qué importa:
-    Los modelos lineales asumen residuos normales. XGBoost y RF son
-    menos sensibles, pero con un target más simétrico:
-    (1) MSE penaliza simétricamente sobre/sub-predicción
-    (2) Los intervalos de predicción son más confiables
-    (3) La comparación entre modelos via RMSE es más justa
- 
-  La mejora de skewness {skew(y_log):.2f} → {skew(y_pt_all):.2f} justifica
-  el costo adicional del PowerTransformer en el pipeline.
+  POR QUÉ NO PowerTransformer en el target:
+    Aunque Yeo-Johnson reduce más el skewness, la inverse_transform
+    no-lineal introduce sesgos sistemáticos en segmentos específicos
+    (especialmente popularidad baja/media), generando R² negativos
+    por segmento incluso con R² global aceptable.
+    log1p evita este problema y es más interpretable.
 """)
  
 # ════════════════════════════════════════════════════════════
