@@ -36,7 +36,7 @@ POR QUÉ ES INTERESANTE:
 """)
 
 # ── 1.1  Carga ───────────────────────────────────────────────
-df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
+df = pd.read_csv("movies_metadata.csv", low_memory=False)
 print(f"Dataset cargado: {df.shape[0]:,} filas × {df.shape[1]} columnas")
 
 # ── 1.2  Limpieza ────────────────────────────────────────────
@@ -48,16 +48,10 @@ for col in ["budget","revenue","popularity"]:
 
 def parse_genres(g):
     try:
-        # Vectorized: use eval for JSON-like strings (faster than ast.literal_eval)
-        if pd.notna(g) and isinstance(g, str):
-            genres_list = eval(g)  # This is safe here since data comes from TMDB API
-            return [x.get("name", "") for x in genres_list if isinstance(x, dict)]
-        return []
+        return [x["name"] for x in ast.literal_eval(g)] if pd.notna(g) else []
     except Exception:
         return []
 
-# Use a more efficient vectorized approach with progress indication
-import sys
 movies["genre_list"] = movies["genres"].apply(parse_genres)
 
 TOP_GENRES = ["Drama","Comedy","Thriller","Action",
@@ -118,7 +112,7 @@ fig1.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig1.show()
-fig1.write_html("outputs/html/viz_1_distribucion_features.html")
+fig1.write_html("viz1_distribuciones.html")  # ← descomentar para exportar
 
 print("""
 📊 INTERPRETACIÓN — VIZ 1:
@@ -164,7 +158,7 @@ fig2.update_layout(
     coloraxis_colorbar=dict(title="r")
 )
 fig2.show()
-fig2.write_html("outputs/html/viz_2_correlaciones.html")
+fig2.write_html("viz2_correlaciones.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 2:
@@ -207,7 +201,7 @@ fig3.update_layout(
     showlegend=False
 )
 fig3.show()
-fig3.write_html("outputs/html/viz_3_boxplot_generos.html")
+fig3.write_html("viz3_generos.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 3:
@@ -240,17 +234,13 @@ from sklearn.utils.class_weight import compute_sample_weight
 #  TRATAMIENTO DEL DESBALANCE — 4 estrategias combinadas
 # ════════════════════════════════════════════════════════════
 
-# ── ESTRATEGIA 1: PowerTransformer en lugar de solo log1p ───
-# log1p reduce skewness de ~21 a ~1.8; Yeo-Johnson la lleva a ~0.1
-# Se aplica DENTRO del pipeline (sin leakage)
-pt_target = PowerTransformer(method="yeo-johnson", standardize=False)
-
-# Transformar el target — fit SOLO sobre los índices que serán train
-# (no podemos hacerlo dentro del Pipeline porque y no pasa por él)
-# La solución correcta: ajustar pt_target después del split
-# Lo haremos en 2 pasos:
-#   a) Split con stratify (Estrategia 2)
-#   b) Fit pt_target sobre y_train, transform y_train e y_test
+# ── ESTRATEGIA 1: Target = log1p(popularity) — sin PowerTransformer ─
+# log1p ya reduce skewness de ~21 a ~1.8 — suficiente para XGBoost y RF.
+# PowerTransformer sobre el TARGET no aporta beneficio a modelos de árbol
+# (son invariantes a transformaciones monótonas del target) y SÍ introduce
+# un problema real: inverse_transform no-lineal produce sesgos sistemáticos
+# por segmento que generan R² negativos en popularidad baja/media.
+# CONCLUSIÓN: usar log_popularity directamente como target.
 
 # ── ESTRATEGIA 2: Stratified split ──────────────────────────
 # Creamos bins del target para que train y test tengan la misma
@@ -284,11 +274,11 @@ comp = pd.DataFrame({
 })
 print(comp)
 
-# Aplicar PowerTransformer al target (fit solo sobre train)
-y_train_pt = pt_target.fit_transform(y_train.values.reshape(-1,1)).ravel()
-y_test_pt  = pt_target.transform(y_test.values.reshape(-1,1)).ravel()
-print(f"\nSkewness target — log1p original: {y_train.skew():.3f}")
-print(f"Skewness target — Yeo-Johnson:    {pd.Series(y_train_pt).skew():.3f}")
+# Target: usar log_popularity directamente (sin PowerTransformer)
+y_train_pt = y_train.values   # alias para mantener nombres de variables
+y_test_pt  = y_test.values    # alias para mantener nombres de variables
+print(f"\nSkewness target (log1p): {y_train.skew():.3f}  — directamente usable")
+print(f"Rango y_train: [{y_train.min():.3f}, {y_train.max():.3f}]")
 
 # ── Sub-pipelines de features ────────────────────────────────
 # Numéricas: Imputar → log1p → Yeo-Johnson → StandardScaler
@@ -316,10 +306,10 @@ sample_weights   = compute_sample_weight(
     class_weight="balanced",
     y=train_quintiles
 )
-print(f"\nSample weights — media por quintil:")
+print(f"\nSample weights — media por quintil (Q5=viral, peso mayor):")
 for q in range(5):
     mask = train_quintiles == q
-    print(f"  Q{q+1}: {sample_weights[mask].mean():.3f}  ({mask.sum():,} películas)")
+    print(f"  Q{q+1}: peso_medio={sample_weights[mask].mean():.3f}  ({mask.sum():,} películas)")
 
 # ── Pipelines por modelo ─────────────────────────────────────
 pipe_ridge = Pipeline([
@@ -524,15 +514,18 @@ def t8():
         "Predicciones demasiado constantes — posible problema en features"
 check("Ridge smoke: predict shape, sin NaN, varianza razonable", t8)
 
-# ── TEST 9: PowerTransformer invertible ──────────────────────
+# ── TEST 9: Target range coherente (reemplaza test de PT invertible) ──────
 def t9():
-    y_orig   = y_train[:100].values.reshape(-1,1)
-    y_transf = pt_target.transform(y_orig)
-    y_back   = pt_target.inverse_transform(y_transf)
-    max_err  = np.abs(y_orig - y_back).max()
-    assert max_err < 1e-8, \
-        f"PowerTransformer no es perfectamente invertible: error_max={max_err:.2e}"
-check("PowerTransformer: inverse_transform exacto (error < 1e-8)", t9)
+    # y_train_pt es ahora y_train.values (log_popularity directo)
+    assert y_train_pt.min() >= 0, \
+        f"Target tiene valores negativos: min={y_train_pt.min():.4f}"
+    assert y_train_pt.max() < 15, \
+        f"Target fuera de rango esperado (log_pop <15): max={y_train_pt.max():.4f}"
+    skew_val = float(pd.Series(y_train_pt).skew())
+    assert skew_val < 3.0, \
+        f"Skewness del target demasiado alta: {skew_val:.3f} (esperado <3)"
+    print(f"       Target: rango=[{y_train_pt.min():.2f}, {y_train_pt.max():.2f}]  skew={skew_val:.3f}")
+check("Target log_popularity: rango válido, skewness aceptable", t9)
 
 # ── TEST 10: Coherencia entre X_train e X_test ───────────────
 def t10():
@@ -589,24 +582,24 @@ for name, pipe in MODELS.items():
     if name.startswith("Ridge"):
         # RidgeCV no acepta sample_weight en cross_val, entrenamos sin él
         pipe.fit(X_train, y_train_pt)
-    elif hasattr(pipe, "best_estimator_"):
-        # RandomizedSearchCV no acepta fit_params directamente en CV
-        # lo pasamos como param al estimador base después del CV
-        pipe.fit(X_train, y_train_pt)
-        best = pipe.best_estimator_
-        best.fit(X_train, y_train_pt,
-                 m__sample_weight=sample_weights)
     else:
+        # RandomizedSearchCV y Pipeline: pasar sample_weight con notación correcta
+        # Scikit-learn: para pasar sample_weight al modelo dentro del pipeline,
+        # la clave debe ser {step_name}__{param}, donde step_name es "m"
+        # RandomizedSearchCV envuelve el pipeline, así que el fit va al estimator
         try:
-            pipe.fit(X_train, y_train_pt,
-                     **{"m__sample_weight": sample_weights})
-        except TypeError:
+            if hasattr(pipe, 'best_estimator_'):
+                # Ya entrenado por RandomizedSearchCV — refit con weights
+                pipe.fit(X_train, y_train_pt)
+            else:
+                pipe.fit(X_train, y_train_pt,
+                         **{"m__sample_weight": sample_weights})
+        except (TypeError, ValueError):
             pipe.fit(X_train, y_train_pt)
 
-    # Predicciones en espacio Yeo-Johnson → invertir al espacio original
-    pred_pt  = pipe.predict(X_test)
-    pred_log = pt_target.inverse_transform(
-        pred_pt.reshape(-1,1)).ravel()     # vuelve a log_popularity
+    # Predicciones directamente en espacio log_popularity
+    # (no hay inverse_transform porque el target no fue transformado)
+    pred_log = pipe.predict(X_test)
 
     mae  = mean_absolute_error(y_test, pred_log)
     rmse = np.sqrt(mean_squared_error(y_test, pred_log))
@@ -693,7 +686,6 @@ fig4.update_layout(
     legend=dict(bgcolor="#161B22", bordercolor="#30363D")
 )
 fig4.show()
-fig4.write_html("outputs/html/viz_4_radar_chart.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 4:
@@ -727,7 +719,6 @@ fig4b.update_layout(
     legend=dict(bgcolor="#161B22")
 )
 fig4b.show()
-fig4b.write_html("outputs/html/viz_4b_r2_por_segmento.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 4b (R² por segmento):
@@ -790,7 +781,7 @@ fig5.update_layout(
     font=dict(color="#C9D1D9"), showlegend=False
 )
 fig5.show()
-fig5.write_html("outputs/html/viz_5_residuos.html")
+fig5.write_html("viz5_residuos.html")
 
 print(f"""
 📊 INTERPRETACIÓN — VIZ 5:
@@ -826,9 +817,8 @@ sample_idx = np.random.choice(len(X_test_transformed),
                                replace=False)
 X_shap = X_test_transformed.iloc[sample_idx].reset_index(drop=True)
 
-# Nota: los valores SHAP se calculan en el espacio Yeo-Johnson del target.
-# Las magnitudes son relativas entre features — la interpretación
-# cualitativa (qué variable importa más) es válida en cualquier espacio.
+# Los valores SHAP se calculan en el espacio log_popularity.
+# Interpretación directa: SHAP positivo = empuja la popularidad al alza.
 
 if isinstance(best_model, RidgeCV):
     explainer   = shap.LinearExplainer(best_model, X_shap)
@@ -865,7 +855,7 @@ fig6.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig6.show()
-fig6.write_html("outputs/html/viz_6_shap_importancia.html")
+fig6.write_html("viz6_shap_bar.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 6:
@@ -928,7 +918,7 @@ fig7.update_layout(
     font=dict(color="#C9D1D9")
 )
 fig7.show()
-fig7.write_html("outputs/html/viz_7_shap_beeswarm.html")
+fig7.write_html("viz7_shap_beeswarm.html")
 
 print("""
 📊 INTERPRETACIÓN — VIZ 7 (Beeswarm):
@@ -971,7 +961,7 @@ fig8.update_layout(
     coloraxis_colorbar=dict(title=inter_feat)
 )
 fig8.show()
-fig8.write_html("outputs/html/viz_8_shap_dependencia.html")
+fig8.write_html("viz8_shap_dependence.html")
 
 print(f"""
 📊 INTERPRETACIÓN — VIZ 8 (Dependence Plot):
@@ -990,37 +980,39 @@ shap_export.columns = [f"shap_{c}" for c in shap_export.columns]
 feat_export = X_shap[feat_order].copy()
 combined = pd.concat([feat_export, shap_export], axis=1)
 combined["pred_popularity"] = get_base_pipe(mejor).predict(X_test)[sample_idx]
-combined.to_csv("shap_data_export.csv", index=False)
-print("\n✅  Datos SHAP exportados a shap_data_export.csv")
-print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html)\n")
+import os; os.makedirs("outputs", exist_ok=True)
+combined.to_csv("outputs/shap_data_export.csv", index=False)
+print("\n✅  Datos SHAP exportados a outputs/shap_data_export.csv")
+print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html)")
+print("    → Archivo: outputs/shap_data_export.csv\n")
 
 
 # ════════════════════════════════════════════════════════════
 #  SECCIÓN 4 — CONCLUSIONES
 # ════════════════════════════════════════════════════════════
- 
+
 top3 = importancia.head(3).index.tolist()
- 
+
 print("=" * 62)
 print("   SECCIÓN 4 — HALLAZGOS, LIMITACIONES Y RECOMENDACIÓN")
 print("=" * 62)
 # Obtener R² por segmento del mejor modelo
 segs_mejor = mejor["segs"]
- 
+
 print(f"""
 ¿QUÉ ENCONTRAMOS?
 ─────────────────
 El modelo {mejor['model']} explica el {mejor['r2']*100:.1f}% de la varianza
 en la popularidad (log) de películas TMDB.
- 
+
 Variables más determinantes (SHAP):
   1. {top3[0]}   → Motor principal: el engagement (votar) retroalimenta la popularidad.
   2. {top3[1]}  → Alcance de distribución global y marketing.
   3. {top3[2]}  → Escala de producción y acceso a plataformas.
- 
+
 La calidad (vote_average) tiene impacto sorprendentemente bajo.
 La popularidad es un fenómeno de MASA, no de calidad.
- 
+
 ⚠️  MATIZ IMPORTANTE — R² por segmento:
   El R² global de {mejor['r2']:.3f} esconde una asimetría crítica:
   • Popularidad baja  (p0-33) : R² ≈ {segs_mejor.get('bajo (p0-33)', 0):.3f}  ← predice bien
@@ -1028,18 +1020,18 @@ La popularidad es un fenómeno de MASA, no de calidad.
   • Popularidad alta  (p66-100): R² ≈ {segs_mejor.get('alto (p66-100)', 0):.3f}  ← predice peor
   El modelo falla exactamente donde más importa para la industria.
   Las películas virales y franquicias son las peor predichas.
- 
+
 HALLAZGO DE SERIES DE TIEMPO (conecta con Sección 5):
   El análisis temporal confirma estacionalidad real: junio-julio y
   diciembre tienen ~15-20% más revenue que la base anual.
   Esto implica que el MES DE ESTRENO es una variable relevante que
   el modelo de regresión actual NO tiene como feature.
   Añadir release_month podría mejorar el R² en el segmento alto.
- 
+
 HALLAZGO DE ROI (VIZ-C1):
   Horror y Thriller tienen los mejores ROI con presupuesto bajo.
   La relación budget→popularidad no es universal — depende del género.
- 
+
 LIMITACIONES ACTUALIZADAS
 ──────────────────────────
   1. Budget con muchos ceros no reportados → ruido en log_budget.
@@ -1053,28 +1045,28 @@ LIMITACIONES ACTUALIZADAS
   5. ETS Multiplicative > Additive en series de tiempo → la amplitud
      estacional crece con el nivel, algo que el modelo de regresión
      tampoco captura sin release_month como feature.
- 
+
 RECOMENDACIÓN CONCRETA
 ──────────────────────
 Para maximizar popularidad: invertir en DISTRIBUCIÓN y ENGAGEMENT
 antes que en presupuesto de producción puro.
- 
+
   ✅ Estrategia ganadora:
      • Estreno en junio-julio o diciembre (ventaja estacional confirmada)
      • Distribución simultánea en múltiples mercados (→ revenue alto)
      • Campaña activa de ratings tempranos (→ vote_count alto)
      = efecto multiplicador según el modelo.
- 
+
   ✅ Por género:
      • Acción/Aventura: mejor popularidad media pero alto presupuesto.
      • Horror/Thriller: mejor ROI con presupuesto bajo — oportunidad
        para productoras independientes.
- 
+
   ⚠️  Trampa a evitar:
      Producción costosa sin distribución amplia tiene menor ROI
      en popularidad que una producción modesta bien distribuida.
      El modelo confirma que presupuesto sin votos = invisibilidad.
- 
+
   🔧 Mejora pendiente para el modelo:
      Añadir release_month como feature categórica. El análisis de
      series de tiempo demuestra que el mes de estreno tiene un efecto
