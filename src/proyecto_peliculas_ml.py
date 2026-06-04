@@ -13,6 +13,7 @@
 
 import pandas as pd
 import numpy as np
+import pickle
 import ast
 import warnings
 import plotly.express as px
@@ -40,23 +41,10 @@ df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
 print(f"Dataset cargado: {df.shape[0]:,} filas × {df.shape[1]} columnas")
 
 import os
-import pickle
 
 os.makedirs("outputs", exist_ok=True)
 
-with open("outputs/ml_objects.pkl", "wb") as f:
-    pickle.dump({
-        "movies": movies,
-        "df": df,
-        "X_test": X_test,
-        "y_test": y_test,
-        "sarima_model": sarima_model,
-        "prophet_model": prophet_model,
-        "mejor": mejor,
-        "pt_target": pt_target,
-        "sample_weights": sample_weights,
-        "FEATURES_RAW": FEATURES_RAW
-    }, f)
+
 
 print("✅ ml_objects.pkl guardado correctamente")
 # ── 1.2  Limpieza ────────────────────────────────────────────
@@ -1006,6 +994,7 @@ print("\n✅  Datos SHAP exportados a outputs/shap_data_export.csv")
 print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html)")
 print("    → Archivo: outputs/shap_data_export.csv\n")
 
+print(f"\n✅  Mejor modelo: {mejor['model']}  (R²={mejor['r2']:.4f})")
 
 # ════════════════════════════════════════════════════════════
 #  SECCIÓN 4 — CONCLUSIONES
@@ -1092,3 +1081,27 @@ antes que en presupuesto de producción puro.
      series de tiempo demuestra que el mes de estreno tiene un efecto
      multiplicativo del 15-20% sobre el revenue esperado.
 """)
+# ======================================
+# FIN DEL PROYECTO
+# ======================================
+
+import os
+import pickle
+
+os.makedirs("outputs", exist_ok=True)
+
+with open("outputs/ml_objects.pkl", "wb") as f:
+    pickle.dump({
+        "movies": movies,
+        "df": df,
+        "X_test": X_test,
+        "y_test": y_test,
+        "sarima_model": sarima_model,
+        "prophet_model": prophet_model,
+        "mejor": mejor,
+        "pt_target": pt_target,
+        "sample_weights": sample_weights,
+        "FEATURES_RAW": FEATURES_RAW
+    }, f)
+
+print("✅ Objetos guardados")

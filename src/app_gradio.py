@@ -438,16 +438,10 @@ with gr.Blocks(css=CSS, title="🎬 Movie Popularity Predictor") as demo:
 
 
 if __name__ == "__main__":
-    try:
-        demo.launch(
-            share=False,
-            server_port=DEFAULT_SERVER_PORT,
-            show_error=True
-        )
-    except OSError as e:
-        print(f"⚠️  Puerto {DEFAULT_SERVER_PORT} ocupado, intentando puerto automático...")
-        demo.launch(
-            share=False,
-            server_port=0,
-            show_error=True
-        )
+    demo.launch(
+        server_name="127.0.0.1",
+        server_port=7861,
+        share=False,
+        show_error=True,
+        inbrowser=True
+    )

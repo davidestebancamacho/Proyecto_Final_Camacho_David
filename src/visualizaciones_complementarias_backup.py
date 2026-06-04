@@ -31,20 +31,17 @@ df = pd.read_csv("data/movies_metadata.csv")
 # recrear movies mínimo necesario
 movies = df.copy()
 import pickle
-
 with open("outputs/ml_objects.pkl", "rb") as f:
-    data = pickle.load(f)
+    objetos = pickle.load(f)
 
-movies = data["movies"]
-ts = data["ts"]
-X_test = data["X_test"]
-y_test = data["y_test"]
-sarima_model = data["sarima_model"]
-prophet_model = data["prophet_model"]
-mejor = data["mejor"]
-pt_target = data["pt_target"]
-sample_weights = data["sample_weights"]
- 
+movies = objetos["movies"]
+X_test = objetos["X_test"]
+y_test = objetos["y_test"]
+sample_weights = objetos["sample_weights"]
+FEATURES_RAW = objetos["FEATURES_RAW"]
+
+
+print("✅ ml_objects.pkl cargado")
 # ── Constantes (definidas aquí para ejecución standalone) ───
 # Si se ejecuta después de proyecto_peliculas_ml.py, ya existen.
 if "TOP_GENRES" not in dir():
@@ -96,6 +93,8 @@ def save(fig, name):
         full_html=True
     )
     print(f"  💾  Guardado → outputs/html/{name}.html")
+    
+    proyecto_peliculas_ml.py
  
 # ════════════════════════════════════════════════════════════
 #  VIZ-C1 — Budget vs Revenue: ROI scatter
