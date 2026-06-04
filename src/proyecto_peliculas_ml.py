@@ -36,7 +36,7 @@ POR QUÉ ES INTERESANTE:
 """)
 
 # ── 1.1  Carga ───────────────────────────────────────────────
-df = pd.read_csv("movies_metadata.csv", low_memory=False)
+df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
 print(f"Dataset cargado: {df.shape[0]:,} filas × {df.shape[1]} columnas")
 
 # ── 1.2  Limpieza ────────────────────────────────────────────
