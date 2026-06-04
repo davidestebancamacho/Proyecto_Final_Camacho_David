@@ -24,6 +24,26 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import warnings
 warnings.filterwarnings("ignore")
+
+# Cargar datos base
+df = pd.read_csv("data/movies_metadata.csv")
+
+# recrear movies mínimo necesario
+movies = df.copy()
+import pickle
+
+with open("outputs/ml_objects.pkl", "rb") as f:
+    data = pickle.load(f)
+
+movies = data["movies"]
+ts = data["ts"]
+X_test = data["X_test"]
+y_test = data["y_test"]
+sarima_model = data["sarima_model"]
+prophet_model = data["prophet_model"]
+mejor = data["mejor"]
+pt_target = data["pt_target"]
+sample_weights = data["sample_weights"]
  
 # ── Constantes (definidas aquí para ejecución standalone) ───
 # Si se ejecuta después de proyecto_peliculas_ml.py, ya existen.
