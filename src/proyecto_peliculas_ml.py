@@ -986,6 +986,29 @@ print("\n✅  Datos SHAP exportados a outputs/shap_data_export.csv")
 print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html)")
 print("    → Archivo: outputs/shap_data_export.csv\n")
 
+# Guardar objetos del modelo para las visualizaciones complementarias.
+# Cada script ejecutado con `python3 archivo.py` corre en un proceso nuevo,
+# así que las variables no quedan disponibles automáticamente en memoria.
+import pickle
+os.makedirs("outputs", exist_ok=True)
+with open("outputs/ml_objects.pkl", "wb") as f:
+    pickle.dump({
+        "movies": movies,
+        "df": df,
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train": y_train,
+        "y_test": y_test,
+        "sample_weights": sample_weights,
+        "mejor": mejor,
+        "FEATURES_RAW": FEATURES_RAW,
+        "FEATURES_OUT": FEATURES_OUT,
+        "TOP_GENRES": TOP_GENRES,
+        "NUM_CONT": NUM_CONT,
+        "GENRE_COLS": GENRE_COLS,
+    }, f)
+print("✅  Objetos ML guardados en outputs/ml_objects.pkl\n")
+
 
 # ════════════════════════════════════════════════════════════
 #  SECCIÓN 4 — CONCLUSIONES
