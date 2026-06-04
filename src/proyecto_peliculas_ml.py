@@ -39,6 +39,26 @@ POR QUÉ ES INTERESANTE:
 df = pd.read_csv("data/movies_metadata.csv", low_memory=False)
 print(f"Dataset cargado: {df.shape[0]:,} filas × {df.shape[1]} columnas")
 
+import os
+import pickle
+
+os.makedirs("outputs", exist_ok=True)
+
+with open("outputs/ml_objects.pkl", "wb") as f:
+    pickle.dump({
+        "movies": movies,
+        "df": df,
+        "X_test": X_test,
+        "y_test": y_test,
+        "sarima_model": sarima_model,
+        "prophet_model": prophet_model,
+        "mejor": mejor,
+        "pt_target": pt_target,
+        "sample_weights": sample_weights,
+        "FEATURES_RAW": FEATURES_RAW
+    }, f)
+
+print("✅ ml_objects.pkl guardado correctamente")
 # ── 1.2  Limpieza ────────────────────────────────────────────
 movies = df[["title","budget","revenue","runtime",
              "vote_average","vote_count","popularity","genres"]].copy()
@@ -985,29 +1005,6 @@ combined.to_csv("outputs/shap_data_export.csv", index=False)
 print("\n✅  Datos SHAP exportados a outputs/shap_data_export.csv")
 print("    → Úsalos en el dashboard HTML interactivo (proyecto_dashboard.html)")
 print("    → Archivo: outputs/shap_data_export.csv\n")
-
-# Guardar objetos del modelo para las visualizaciones complementarias.
-# Cada script ejecutado con `python3 archivo.py` corre en un proceso nuevo,
-# así que las variables no quedan disponibles automáticamente en memoria.
-import pickle
-os.makedirs("outputs", exist_ok=True)
-with open("outputs/ml_objects.pkl", "wb") as f:
-    pickle.dump({
-        "movies": movies,
-        "df": df,
-        "X_train": X_train,
-        "X_test": X_test,
-        "y_train": y_train,
-        "y_test": y_test,
-        "sample_weights": sample_weights,
-        "mejor": mejor,
-        "FEATURES_RAW": FEATURES_RAW,
-        "FEATURES_OUT": FEATURES_OUT,
-        "TOP_GENRES": TOP_GENRES,
-        "NUM_CONT": NUM_CONT,
-        "GENRE_COLS": GENRE_COLS,
-    }, f)
-print("✅  Objetos ML guardados en outputs/ml_objects.pkl\n")
 
 
 # ════════════════════════════════════════════════════════════
