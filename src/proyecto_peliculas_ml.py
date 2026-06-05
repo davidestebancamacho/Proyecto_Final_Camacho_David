@@ -1096,8 +1096,6 @@ with open("outputs/ml_objects.pkl", "wb") as f:
         "df": df,
         "X_test": X_test,
         "y_test": y_test,
-        "sarima_model": sarima_model,
-        "prophet_model": prophet_model,
         "mejor": mejor,
         "pt_target": pt_target,
         "sample_weights": sample_weights,
